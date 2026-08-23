@@ -30,7 +30,8 @@ async function persistAgentConfig(formData: FormData): Promise<{ error: string |
   const configParsed = agentConfigFormSchema.safeParse(configInput);
   const clinicParsed = clinicDetailsSchema.safeParse(clinicInput);
   if (!configParsed.success || !clinicParsed.success) {
-    return { error: "Revisa los campos del formulario, hay datos inválidos." };
+    const firstIssue = clinicParsed.error?.issues[0] ?? configParsed.error?.issues[0];
+    return { error: firstIssue?.message ?? "Revisa los campos del formulario, hay datos inválidos." };
   }
 
   const supabase = await createClient();

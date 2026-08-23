@@ -79,9 +79,19 @@ export const agentConfigFormSchema = z.object({
   handoff_message: z.string().optional(),
 });
 
+const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+
 export const clinicDetailsSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().optional(),
+  // VAPI usa este número como destino de la tool nativa transferCall, que exige
+  // formato E.164 (+ código de país). Se valida aquí para fallar al guardar,
+  // con un mensaje claro, en vez de fallar más tarde al publicar en VAPI.
+  phone: z
+    .string()
+    .optional()
+    .refine((value) => !value || E164_PHONE_REGEX.test(value), {
+      message: "El teléfono debe estar en formato internacional E.164, ej. +18397379225 (con + y código de país, sin espacios ni guiones).",
+    }),
   address: z.string().optional(),
   timezone: z.string().min(1),
 });

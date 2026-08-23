@@ -54,7 +54,10 @@ export function ClinicInfoForm({
         </div>
         <div>
           <Label htmlFor="clinic_phone">Teléfono de recepción</Label>
-          <Input id="clinic_phone" value={clinicPhone} onChange={(e) => onClinicPhoneChange(e.target.value)} placeholder="+52..." />
+          <Input id="clinic_phone" value={clinicPhone} onChange={(e) => onClinicPhoneChange(e.target.value)} placeholder="+528112345678" />
+          <p className="mt-1 text-xs text-muted">
+            Formato internacional E.164: + código de país, sin espacios ni guiones. Déjalo vacío si no quieres transferencia a recepción.
+          </p>
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="clinic_address">Dirección</Label>
