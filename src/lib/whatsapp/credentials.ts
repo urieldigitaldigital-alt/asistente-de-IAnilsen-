@@ -5,20 +5,18 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
 export interface WhatsappCredentialsInput {
+  twilioAccountSid: string;
+  twilioAuthToken: string;
   whatsappNumber: string;
-  metaPhoneNumberId: string;
-  metaAccessToken: string;
-  metaVerifyToken: string;
 }
 
 export interface DecryptedWhatsappCredentials {
+  twilioAccountSid: string;
+  twilioAuthToken: string;
   whatsappNumber: string;
-  metaPhoneNumberId: string;
-  metaAccessToken: string;
-  metaVerifyToken: string;
 }
 
-/** Guarda (o reemplaza) las credenciales de WhatsApp (Meta Cloud API) del negocio del usuario autenticado. */
+/** Guarda (o reemplaza) las credenciales de WhatsApp del negocio del usuario autenticado. */
 export async function saveWhatsappCredentials(input: WhatsappCredentialsInput): Promise<void> {
   const supabase = await createClient();
   const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
@@ -27,10 +25,9 @@ export async function saveWhatsappCredentials(input: WhatsappCredentialsInput): 
   const { error } = await supabase.from("whatsapp_credentials").upsert(
     {
       clinic_id: clinic.id,
+      twilio_account_sid: input.twilioAccountSid,
+      twilio_auth_token_encrypted: encrypt(input.twilioAuthToken),
       whatsapp_number: input.whatsappNumber,
-      meta_phone_number_id: input.metaPhoneNumberId,
-      meta_access_token_encrypted: encrypt(input.metaAccessToken),
-      meta_verify_token: encrypt(input.metaVerifyToken),
     },
     { onConflict: "clinic_id" }
   );
@@ -42,39 +39,22 @@ export async function hasWhatsappCredentials(clinicId: string, supabase: Supabas
   return Boolean(data);
 }
 
-/** Credenciales descifradas, buscadas por el Phone Number ID de Meta que recibió el mensaje (uso: webhook, cliente admin). */
-export async function getWhatsappCredentialsByPhoneNumberId(
-  metaPhoneNumberId: string,
+/** Credenciales de WhatsApp descifradas, buscadas por el número de WhatsApp receptor (uso: webhook, cliente admin). */
+export async function getWhatsappCredentialsByNumber(
+  whatsappNumber: string,
   supabase: SupabaseClient<Database>
 ): Promise<(DecryptedWhatsappCredentials & { clinicId: string }) | null> {
   const { data, error } = await supabase
     .from("whatsapp_credentials")
-    .select("clinic_id, whatsapp_number, meta_phone_number_id, meta_access_token_encrypted, meta_verify_token")
-    .eq("meta_phone_number_id", metaPhoneNumberId)
+    .select("clinic_id, twilio_account_sid, twilio_auth_token_encrypted, whatsapp_number")
+    .eq("whatsapp_number", whatsappNumber)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return {
     clinicId: data.clinic_id,
+    twilioAccountSid: data.twilio_account_sid,
+    twilioAuthToken: decrypt(data.twilio_auth_token_encrypted),
     whatsappNumber: data.whatsapp_number,
-    metaPhoneNumberId: data.meta_phone_number_id,
-    metaAccessToken: decrypt(data.meta_access_token_encrypted),
-    metaVerifyToken: decrypt(data.meta_verify_token),
   };
-}
-
-/** Busca, entre todos los negocios, el que tenga este verify token — usado en la verificación GET del webhook de Meta. */
-export async function findClinicByVerifyToken(
-  verifyToken: string,
-  supabase: SupabaseClient<Database>
-): Promise<string | null> {
-  const { data } = await supabase.from("whatsapp_credentials").select("clinic_id, meta_verify_token");
-  const match = (data ?? []).find((row) => {
-    try {
-      return decrypt(row.meta_verify_token) === verifyToken;
-    } catch {
-      return false;
-    }
-  });
-  return match?.clinic_id ?? null;
 }

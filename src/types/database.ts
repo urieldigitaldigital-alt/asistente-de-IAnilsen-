@@ -137,17 +137,15 @@ export interface Database {
         Row: {
           clinic_id: string;
           whatsapp_number: string;
-          meta_phone_number_id: string;
-          meta_access_token_encrypted: string;
-          meta_verify_token: string;
+          twilio_account_sid: string;
+          twilio_auth_token_encrypted: string;
           updated_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]> & {
           clinic_id: string;
           whatsapp_number: string;
-          meta_phone_number_id: string;
-          meta_access_token_encrypted: string;
-          meta_verify_token: string;
+          twilio_account_sid: string;
+          twilio_auth_token_encrypted: string;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]>;
         Relationships: [];
