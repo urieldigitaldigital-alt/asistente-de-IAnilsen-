@@ -39,29 +39,23 @@ export function WhatsAppCard({ connected, assistantId }: { connected: boolean; a
       )}
 
       <p className="text-sm text-muted">
-        El mismo asistente que atiende llamadas responde automáticamente los mensajes de WhatsApp. Usa un número de prueba
-        de Meta (developers.facebook.com) — mirá la guía de arriba para conseguir estos datos.
+        El mismo asistente que atiende llamadas responde automáticamente los mensajes de WhatsApp (agenda, consulta y
+        cancela citas igual que por teléfono). Necesitás un número registrado como WhatsApp Sender en Twilio — mirá la
+        guía de arriba.
       </p>
 
       <form action={formAction} className="space-y-2">
         <div>
-          <Label htmlFor="whatsappNumber">Número de WhatsApp (el que te dio Meta)</Label>
-          <Input id="whatsappNumber" name="whatsappNumber" placeholder="+15551234567" required />
+          <Label htmlFor="whatsappNumber">Tu número de WhatsApp (formato internacional)</Label>
+          <Input id="whatsappNumber" name="whatsappNumber" placeholder="+5491122334455" required />
         </div>
         <div>
-          <Label htmlFor="metaPhoneNumberId">Phone Number ID (de Meta)</Label>
-          <Input id="metaPhoneNumberId" name="metaPhoneNumberId" placeholder="123456789012345" required />
+          <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
+          <Input id="twilioAccountSid" name="twilioAccountSid" placeholder="AC..." autoComplete="off" required />
         </div>
         <div>
-          <Label htmlFor="metaAccessToken">Access Token (de Meta)</Label>
-          <Input id="metaAccessToken" name="metaAccessToken" type="password" autoComplete="off" required />
-        </div>
-        <div>
-          <Label htmlFor="metaVerifyToken">Verify Token (inventá uno, ej. &quot;asistente2026&quot;)</Label>
-          <Input id="metaVerifyToken" name="metaVerifyToken" autoComplete="off" placeholder="asistente2026" required />
-          <p className="mt-1 text-xs text-muted">
-            Este valor lo elegís vos — usá el mismo texto acá y en el webhook de Meta.
-          </p>
+          <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
+          <Input id="twilioAuthToken" name="twilioAuthToken" type="password" autoComplete="off" required />
         </div>
         <Button type="submit" disabled={pending || !assistantId} className="w-full">
           {pending ? "Guardando…" : connected ? "Actualizar" : "Conectar WhatsApp"}
