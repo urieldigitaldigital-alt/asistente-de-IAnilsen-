@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { linkPhoneNumber, syncAssistant } from "@/lib/vapi/sync";
+import { linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
 import { vapiPhoneNumberFormSchema } from "@/lib/validation";
 
 export interface VapiActionState {
@@ -26,6 +26,26 @@ export async function publishAssistantAction(
   } catch (err) {
     console.error("Error publicando el asistente en VAPI:", err);
     return { error: err instanceof Error ? err.message : "No se pudo publicar el asistente.", success: null };
+  }
+}
+
+export async function provisionVapiNumberAction(
+  _prevState: VapiActionState,
+  _formData: FormData
+): Promise<VapiActionState> {
+  try {
+    const result = await provisionVapiNumber();
+    revalidatePath("/integraciones");
+    revalidatePath("/dashboard");
+    return {
+      error: null,
+      success: result.number
+        ? `Número obtenido: ${result.number}`
+        : "Número obtenido y vinculado. Puede tardar unos segundos en activarse — recarga la página si todavía no ves el número.",
+    };
+  } catch (err) {
+    console.error("Error obteniendo un número de VAPI:", err);
+    return { error: err instanceof Error ? err.message : "No se pudo obtener el número.", success: null };
   }
 }
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { GoogleCalendarCard } from "@/components/integrations/GoogleCalendarCard";
 import { VapiNumberCard } from "@/components/integrations/VapiNumberCard";
 import { createClient } from "@/lib/supabase/server";
+import { getPhoneNumberDigits } from "@/lib/vapi/sync";
 
 export const metadata: Metadata = { title: "Integraciones — Asistente Nilsen IA" };
 
@@ -22,6 +23,8 @@ export default async function IntegrationsPage({
     supabase.from("google_credentials").select("clinic_id").eq("clinic_id", clinic.id).maybeSingle(),
   ]);
 
+  const phoneNumber = config?.vapi_phone_number_id ? await getPhoneNumberDigits(config.vapi_phone_number_id) : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -34,6 +37,7 @@ export default async function IntegrationsPage({
         <VapiNumberCard
           assistantId={config?.vapi_assistant_id ?? null}
           phoneNumberId={config?.vapi_phone_number_id ?? null}
+          phoneNumber={phoneNumber}
         />
       </div>
     </div>

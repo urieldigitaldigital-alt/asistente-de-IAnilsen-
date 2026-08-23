@@ -12,6 +12,14 @@ const AZURE_SPANISH_VOICES = [
   { id: "es-AR-TomasNeural", label: "Tomás (es-AR, hombre)" },
 ];
 
+// Voces de ElevenLabs ya agregadas a la cuenta conectada — cualquier negocio
+// puede elegirlas directo, sin pegar ningún Voice ID a mano.
+const ELEVENLABS_VOICES = [
+  { id: "QK4xDwo9ESPHA4JNUpX3", label: "Tomás (es-AR, hombre)" },
+  { id: "atjKTpMVR2FSKqU1iDs1", label: "Brigid (es-AR, mujer)" },
+];
+const CUSTOM_VOICE_VALUE = "__custom__";
+
 const VOICE_PROVIDERS = [
   { id: "azure", label: "Azure (incluido, sin cuenta extra)" },
   { id: "11labs", label: "ElevenLabs (voz más realista, requiere tu propia cuenta)" },
@@ -58,6 +66,8 @@ export function VoiceLanguageSelect({
   onModelNameChange,
 }: VoiceLanguageSelectProps) {
   const isElevenLabs = voiceProvider === "11labs";
+  const elevenLabsPreset = ELEVENLABS_VOICES.find((v) => v.id === voiceId);
+  const elevenLabsSelectValue = isElevenLabs && !elevenLabsPreset ? CUSTOM_VOICE_VALUE : (elevenLabsPreset?.id ?? ELEVENLABS_VOICES[0].id);
 
   return (
     <Card className="space-y-4">
@@ -73,7 +83,7 @@ export function VoiceLanguageSelect({
               onVoiceProviderChange(nextProvider);
               // Al cambiar de proveedor, el voiceId de Azure no sirve para
               // ElevenLabs (y viceversa) — reseteamos a un valor válido.
-              onVoiceIdChange(nextProvider === "11labs" ? "" : AZURE_SPANISH_VOICES[0].id);
+              onVoiceIdChange(nextProvider === "11labs" ? ELEVENLABS_VOICES[0].id : AZURE_SPANISH_VOICES[0].id);
               // ElevenLabs no acepta velocidades > 1.2x — VAPI devuelve un 400
               // si se publica con un valor heredado de Azure fuera de rango.
               if (nextProvider === "11labs" && speed > 1.2) onSpeedChange(1.15);
@@ -90,13 +100,31 @@ export function VoiceLanguageSelect({
         <div>
           {isElevenLabs ? (
             <>
-              <Label htmlFor="voice_id">Voice ID de ElevenLabs</Label>
-              <Input
+              <Label htmlFor="voice_id">Voz (ElevenLabs)</Label>
+              <select
                 id="voice_id"
-                value={voiceId}
-                onChange={(e) => onVoiceIdChange(e.target.value)}
-                placeholder="ej. EXAVITQu4vr4xnSDxMaL"
-              />
+                value={elevenLabsSelectValue}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  onVoiceIdChange(next === CUSTOM_VOICE_VALUE ? "" : next);
+                }}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {ELEVENLABS_VOICES.map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {voice.label}
+                  </option>
+                ))}
+                <option value={CUSTOM_VOICE_VALUE}>Otra (pegar Voice ID)…</option>
+              </select>
+              {elevenLabsSelectValue === CUSTOM_VOICE_VALUE && (
+                <Input
+                  className="mt-2"
+                  value={voiceId}
+                  onChange={(e) => onVoiceIdChange(e.target.value)}
+                  placeholder="Voice ID de tu Voice Library, ej. EXAVITQu4vr4xnSDxMaL"
+                />
+              )}
             </>
           ) : (
             <>
@@ -153,8 +181,8 @@ export function VoiceLanguageSelect({
       </div>
       {isElevenLabs ? (
         <p className="text-xs text-muted-foreground">
-          Pegá aquí el &quot;Voice ID&quot; de una voz en español copiado desde la Voice Library de tu cuenta de ElevenLabs. Velocidad
-          máxima admitida para ElevenLabs: 1.2x.
+          Estas voces ya están listas para usar, no necesitás ninguna cuenta ni configuración extra. Velocidad máxima admitida
+          para ElevenLabs: 1.2x.
         </p>
       ) : null}
     </Card>

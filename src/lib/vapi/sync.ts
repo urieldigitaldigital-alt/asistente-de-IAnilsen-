@@ -148,7 +148,49 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
   return { assistantId, created };
 }
 
-/** Vincula un número de VAPI (ya creado por el dueño en el dashboard) al assistant publicado de la clínica. */
+export interface ProvisionedPhoneNumber {
+  phoneNumberId: string;
+  number: string | null;
+}
+
+/**
+ * Obtiene automáticamente un número de teléfono propio de VAPI (provider
+ * "vapi") y lo vincula al assistant del negocio — sin que el dueño tenga que
+ * entrar al dashboard de VAPI ni copiar ningún UUID a mano.
+ */
+export async function provisionVapiNumber(): Promise<ProvisionedPhoneNumber> {
+  const supabase = await createClient();
+
+  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("*").single();
+  if (clinicError || !clinic) throw new Error("No se encontró el negocio del usuario.");
+
+  const { data: config, error: configError } = await supabase
+    .from("agent_configs")
+    .select("clinic_id, vapi_assistant_id")
+    .eq("clinic_id", clinic.id)
+    .single();
+  if (configError || !config) throw new Error("No se encontró la configuración del agente.");
+  if (!config.vapi_assistant_id) {
+    throw new Error("Publica el asistente antes de obtener un número.");
+  }
+
+  const vapi = getVapiClient();
+  const phoneNumber = await vapi.phoneNumbers.create({
+    provider: "vapi",
+    name: clinic.name.slice(0, 40),
+    assistantId: config.vapi_assistant_id,
+  });
+
+  const { error: updateError } = await supabase
+    .from("agent_configs")
+    .update({ vapi_phone_number_id: phoneNumber.id })
+    .eq("clinic_id", clinic.id);
+  if (updateError) throw updateError;
+
+  return { phoneNumberId: phoneNumber.id, number: phoneNumber.number ?? null };
+}
+
+/** Vincula un número de VAPI (ya creado por el dueño en el dashboard, ej. un número propio importado) al assistant publicado de la clínica. */
 export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
   const supabase = await createClient();
 
@@ -174,4 +216,16 @@ export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
     .update({ vapi_phone_number_id: phoneNumberId })
     .eq("clinic_id", config.clinic_id);
   if (updateError) throw updateError;
+}
+
+/** Trae los dígitos del número (para mostrarlo en Integraciones) — puede ser null mientras se está activando. */
+export async function getPhoneNumberDigits(phoneNumberId: string): Promise<string | null> {
+  const vapi = getVapiClient();
+  try {
+    const phoneNumber = await vapi.phoneNumbers.get({ id: phoneNumberId });
+    return "number" in phoneNumber ? (phoneNumber.number ?? null) : null;
+  } catch (err) {
+    console.error("No se pudo leer el número de VAPI:", err);
+    return null;
+  }
 }
