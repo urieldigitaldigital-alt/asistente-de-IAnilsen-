@@ -4,6 +4,7 @@ import { CaretDownIcon, CheckCircleIcon, PhoneIcon, WarningCircleIcon } from "@p
 import { useActionState, useState } from "react";
 
 import {
+  importTwilioNumberAction,
   linkPhoneNumberAction,
   provisionVapiNumberAction,
   publishAssistantAction,
@@ -25,9 +26,11 @@ export function VapiNumberCard({
   phoneNumber: string | null;
 }) {
   const [provisionState, provisionAction, provisionPending] = useActionState(provisionVapiNumberAction, idleState);
+  const [twilioState, twilioAction, twilioPending] = useActionState(importTwilioNumberAction, idleState);
   const [linkState, linkAction, linkPending] = useActionState(linkPhoneNumberAction, idleState);
   const [publishState, publishAction, publishPending] = useActionState(publishAssistantAction, idleState);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showTwilio, setShowTwilio] = useState(false);
+  const [showRawUuid, setShowRawUuid] = useState(false);
 
   return (
     <Card className="space-y-4">
@@ -61,37 +64,68 @@ export function VapiNumberCard({
         </p>
       )}
 
-      {!phoneNumberId ? (
-        <form action={provisionAction}>
-          <Button type="submit" disabled={provisionPending || !assistantId} className="w-full">
-            {provisionPending ? "Obteniendo número…" : "Obtener número automáticamente"}
-          </Button>
-          {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
-          {provisionState.success && <p className="mt-2 text-sm text-primary">{provisionState.success}</p>}
-          <p className="mt-2 text-xs text-muted">
-            Crea y vincula un número al instante, sin salir de este panel. Ideal para empezar a probar ya mismo.
-          </p>
-        </form>
-      ) : (
-        <form action={provisionAction}>
-          <Button type="submit" variant="secondary" disabled={provisionPending} className="w-full">
-            {provisionPending ? "Obteniendo…" : "Obtener otro número"}
-          </Button>
-          {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
-          {provisionState.success && <p className="mt-2 text-sm text-primary">{provisionState.success}</p>}
-        </form>
-      )}
+      <form action={provisionAction}>
+        <Button type="submit" disabled={provisionPending || !assistantId} className="w-full">
+          {provisionPending ? "Obteniendo número…" : phoneNumberId ? "Obtener otro número (EE.UU.)" : "Obtener número automáticamente (EE.UU.)"}
+        </Button>
+        {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
+        {provisionState.success && <p className="mt-2 text-sm text-primary">{provisionState.success}</p>}
+        <p className="mt-2 text-xs text-muted">
+          Crea y vincula un número al instante, sin salir de este panel. VAPI solo asigna números de EE.UU. — requiere una
+          tarjeta cargada en tu cuenta de VAPI (Settings → Billing).
+        </p>
+      </form>
 
       <div>
         <button
           type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
+          onClick={() => setShowTwilio((v) => !v)}
           className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
         >
-          <CaretDownIcon size={12} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-          Ya tengo mi propio número (Twilio, etc.)
+          <CaretDownIcon size={12} className={`transition-transform ${showTwilio ? "rotate-180" : ""}`} />
+          Importar un número propio de Twilio (ej. de Argentina)
         </button>
-        {showAdvanced && (
+        {showTwilio && (
+          <form action={twilioAction} className="mt-2 space-y-2">
+            <div>
+              <Label htmlFor="number">Número (formato internacional)</Label>
+              <Input id="number" name="number" placeholder="+5491122334455" required />
+            </div>
+            <div>
+              <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
+              <Input id="twilioAccountSid" name="twilioAccountSid" placeholder="AC..." autoComplete="off" required />
+            </div>
+            <div>
+              <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
+              <Input id="twilioAuthToken" name="twilioAuthToken" type="password" autoComplete="off" required />
+            </div>
+            <Button type="submit" variant="secondary" disabled={twilioPending || !assistantId} className="w-full">
+              {twilioPending ? "Importando…" : "Importar y vincular"}
+            </Button>
+            {twilioState.error && <p className="text-sm text-danger">{twilioState.error}</p>}
+            {twilioState.success && <p className="text-sm text-primary">{twilioState.success}</p>}
+            <p className="text-xs text-muted">
+              Comprá el número en{" "}
+              <a href="https://twilio.com" target="_blank" rel="noopener noreferrer" className="underline">
+                twilio.com
+              </a>{" "}
+              y copiá estos 3 datos desde la Consola de Twilio (Account SID y Auth Token están en la página principal). No
+              guardamos el Auth Token — se envía directo a VAPI para activar el número.
+            </p>
+          </form>
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowRawUuid((v) => !v)}
+          className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
+        >
+          <CaretDownIcon size={12} className={`transition-transform ${showRawUuid ? "rotate-180" : ""}`} />
+          Ya tengo el UUID de un número creado en VAPI
+        </button>
+        {showRawUuid && (
           <form action={linkAction} className="mt-2 space-y-2">
             <Label htmlFor="phoneNumberId">UUID del número en VAPI</Label>
             <div className="flex gap-2">
@@ -102,10 +136,6 @@ export function VapiNumberCard({
             </div>
             {linkState.error && <p className="text-sm text-danger">{linkState.error}</p>}
             {linkState.success && <p className="text-sm text-primary">{linkState.success}</p>}
-            <p className="text-xs text-muted">
-              Para usar un número propio (ej. un número argentino importado desde Twilio), impórtalo primero en el dashboard de
-              VAPI y pegá aquí su UUID (no el +54...).
-            </p>
           </form>
         )}
       </div>

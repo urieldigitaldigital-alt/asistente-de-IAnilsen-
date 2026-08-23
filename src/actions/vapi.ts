@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
-import { vapiPhoneNumberFormSchema } from "@/lib/validation";
+import { importTwilioNumber, linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
+import { twilioImportFormSchema, vapiPhoneNumberFormSchema } from "@/lib/validation";
 
 export interface VapiActionState {
   error: string | null;
@@ -46,6 +46,34 @@ export async function provisionVapiNumberAction(
   } catch (err) {
     console.error("Error obteniendo un número de VAPI:", err);
     return { error: err instanceof Error ? err.message : "No se pudo obtener el número.", success: null };
+  }
+}
+
+export async function importTwilioNumberAction(
+  _prevState: VapiActionState,
+  formData: FormData
+): Promise<VapiActionState> {
+  const parsed = twilioImportFormSchema.safeParse({
+    number: formData.get("number"),
+    twilioAccountSid: formData.get("twilioAccountSid"),
+    twilioAuthToken: formData.get("twilioAuthToken"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos de Twilio inválidos.", success: null };
+  }
+
+  try {
+    const result = await importTwilioNumber(parsed.data);
+    revalidatePath("/integraciones");
+    revalidatePath("/dashboard");
+    return {
+      error: null,
+      success: result.number ? `Número de Twilio importado: ${result.number}` : "Número de Twilio importado y vinculado.",
+    };
+  } catch (err) {
+    // No loguear `err` completo si pudiera incluir el auth token en el mensaje de VAPI.
+    console.error("Error importando número de Twilio a VAPI.");
+    return { error: err instanceof Error ? err.message : "No se pudo importar el número de Twilio.", success: null };
   }
 }
 

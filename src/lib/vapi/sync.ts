@@ -193,6 +193,53 @@ export async function provisionVapiNumber(): Promise<ProvisionedPhoneNumber> {
   return { phoneNumberId: phoneNumber.id, number: phoneNumber.number ?? null };
 }
 
+export interface TwilioImportParams {
+  number: string;
+  twilioAccountSid: string;
+  twilioAuthToken: string;
+}
+
+/**
+ * Importa un número ya comprado en Twilio y lo vincula al assistant, todo en
+ * un solo paso por API — el dueño no necesita tocar el dashboard de VAPI.
+ * El Auth Token de Twilio se reenvía a VAPI (que lo necesita para operar el
+ * número) y nunca se guarda en nuestra base de datos.
+ */
+export async function importTwilioNumber(params: TwilioImportParams): Promise<ProvisionedPhoneNumber> {
+  const supabase = await createClient();
+
+  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("*").single();
+  if (clinicError || !clinic) throw new Error("No se encontró el negocio del usuario.");
+
+  const { data: config, error: configError } = await supabase
+    .from("agent_configs")
+    .select("clinic_id, vapi_assistant_id")
+    .eq("clinic_id", clinic.id)
+    .single();
+  if (configError || !config) throw new Error("No se encontró la configuración del agente.");
+  if (!config.vapi_assistant_id) {
+    throw new Error("Publica el asistente antes de importar un número.");
+  }
+
+  const vapi = getVapiClient();
+  const phoneNumber = await vapi.phoneNumbers.create({
+    provider: "twilio",
+    number: params.number,
+    twilioAccountSid: params.twilioAccountSid,
+    twilioAuthToken: params.twilioAuthToken,
+    name: clinic.name.slice(0, 40),
+    assistantId: config.vapi_assistant_id,
+  });
+
+  const { error: updateError } = await supabase
+    .from("agent_configs")
+    .update({ vapi_phone_number_id: phoneNumber.id })
+    .eq("clinic_id", clinic.id);
+  if (updateError) throw updateError;
+
+  return { phoneNumberId: phoneNumber.id, number: "number" in phoneNumber ? (phoneNumber.number ?? null) : null };
+}
+
 /** Vincula un número de VAPI (ya creado por el dueño en el dashboard, ej. un número propio importado) al assistant publicado de la clínica. */
 export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
   const supabase = await createClient();
