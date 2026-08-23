@@ -78,6 +78,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
       "9. Si el paciente pide hablar con una persona, o hay una urgencia que no puedas resolver, usa la transferencia a recepción o registra un handoff.",
       "10. En cuanto el paciente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despídete brevemente en una sola frase y de inmediato llama a la tool endCall para colgar la llamada. No sigas hablando después de despedirte.",
       "11. Sé conciso en cada turno: frases cortas, sin relleno ni repetir información que el paciente ya confirmó. El objetivo es una llamada breve y directa, no una lectura formal.",
+      "12. Di siempre los números en español, nunca en inglés. Los teléfonos léelos dígito por dígito en español (ej. \"cuatro, uno, cero, uno...\"), nunca como un número completo. Las horas dilas en palabras (\"a las tres de la tarde\"), nunca como \"3:00 PM\" ni en inglés.",
     ].join("\n"),
     "",
     `Idioma de la conversación: ${config.language === "es" ? "español" : config.language}. Tono: ${config.tone}.`,

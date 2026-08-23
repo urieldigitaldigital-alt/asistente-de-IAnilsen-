@@ -45,6 +45,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [services, setServices] = useState<ClinicService[]>(config.services);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(config.business_hours);
 
+  const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
   const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
   const [speed, setSpeed] = useState(config.voice.speed ?? 1.15);
   const [language, setLanguage] = useState(config.language);
@@ -61,7 +62,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         clinic_info: { policies, paymentMethods, faq },
         services,
         business_hours: businessHours,
-        voice: { provider: "azure", voiceId, speed },
+        voice: { provider: voiceProvider, voiceId, speed },
         language,
         model: { provider: "openai", model: modelName },
         first_message: firstMessage,
@@ -75,6 +76,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       faq,
       services,
       businessHours,
+      voiceProvider,
       voiceId,
       speed,
       language,
@@ -122,6 +124,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       <ServicesEditor services={services} onChange={setServices} />
       <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
       <VoiceLanguageSelect
+        voiceProvider={voiceProvider}
+        onVoiceProviderChange={setVoiceProvider}
         voiceId={voiceId}
         onVoiceIdChange={setVoiceId}
         speed={speed}

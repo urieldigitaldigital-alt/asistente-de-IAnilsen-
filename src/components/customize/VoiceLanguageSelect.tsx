@@ -12,6 +12,11 @@ const AZURE_SPANISH_VOICES = [
   { id: "es-AR-TomasNeural", label: "Tomás (es-AR, hombre)" },
 ];
 
+const VOICE_PROVIDERS = [
+  { id: "azure", label: "Azure (incluido, sin cuenta extra)" },
+  { id: "11labs", label: "ElevenLabs (voz más realista, requiere tu propia cuenta)" },
+];
+
 const LANGUAGES = [
   { code: "es", label: "Español" },
   { code: "en", label: "Inglés" },
@@ -26,6 +31,8 @@ const SPEED_OPTIONS = [
 ];
 
 interface VoiceLanguageSelectProps {
+  voiceProvider: string;
+  onVoiceProviderChange: (value: string) => void;
   voiceId: string;
   onVoiceIdChange: (value: string) => void;
   speed: number;
@@ -37,6 +44,8 @@ interface VoiceLanguageSelectProps {
 }
 
 export function VoiceLanguageSelect({
+  voiceProvider,
+  onVoiceProviderChange,
   voiceId,
   onVoiceIdChange,
   speed,
@@ -46,24 +55,61 @@ export function VoiceLanguageSelect({
   modelName,
   onModelNameChange,
 }: VoiceLanguageSelectProps) {
+  const isElevenLabs = voiceProvider === "11labs";
+
   return (
     <Card className="space-y-4">
       <h2 className="text-sm font-semibold">Voz, idioma y modelo</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <Label htmlFor="voice_id">Voz (Azure)</Label>
+          <Label htmlFor="voice_provider">Proveedor de voz</Label>
           <select
-            id="voice_id"
-            value={voiceId}
-            onChange={(e) => onVoiceIdChange(e.target.value)}
+            id="voice_provider"
+            value={voiceProvider}
+            onChange={(e) => {
+              const nextProvider = e.target.value;
+              onVoiceProviderChange(nextProvider);
+              // Al cambiar de proveedor, el voiceId de Azure no sirve para
+              // ElevenLabs (y viceversa) — reseteamos a un valor válido.
+              onVoiceIdChange(nextProvider === "11labs" ? "" : AZURE_SPANISH_VOICES[0].id);
+            }}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            {AZURE_SPANISH_VOICES.map((voice) => (
-              <option key={voice.id} value={voice.id}>
-                {voice.label}
+            {VOICE_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          {isElevenLabs ? (
+            <>
+              <Label htmlFor="voice_id">Voice ID de ElevenLabs</Label>
+              <Input
+                id="voice_id"
+                value={voiceId}
+                onChange={(e) => onVoiceIdChange(e.target.value)}
+                placeholder="ej. EXAVITQu4vr4xnSDxMaL"
+              />
+            </>
+          ) : (
+            <>
+              <Label htmlFor="voice_id">Voz (Azure)</Label>
+              <select
+                id="voice_id"
+                value={voiceId}
+                onChange={(e) => onVoiceIdChange(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {AZURE_SPANISH_VOICES.map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {voice.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
         <div>
           <Label htmlFor="voice_speed">Velocidad de habla</Label>
@@ -100,6 +146,12 @@ export function VoiceLanguageSelect({
           <Input id="model_name" value={modelName} onChange={(e) => onModelNameChange(e.target.value)} placeholder="gpt-4.1" />
         </div>
       </div>
+      {isElevenLabs ? (
+        <p className="text-xs text-muted-foreground">
+          Necesitas conectar tu propia cuenta de ElevenLabs una sola vez desde el dashboard de VAPI (Settings → Provider Keys → 11Labs),
+          y pegar aquí el &quot;Voice ID&quot; de una voz en español copiado desde la Voice Library de ElevenLabs.
+        </p>
+      ) : null}
     </Card>
   );
 }

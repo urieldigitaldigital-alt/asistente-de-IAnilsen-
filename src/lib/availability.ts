@@ -78,17 +78,34 @@ export function parseLocalDateTime(input: string, timeZone: string): Date {
   return zonedTimeToUtc(Number(year), Number(month), Number(day), Number(hour), Number(minute), timeZone);
 }
 
-/** Formatea un instante en la timezone de la clínica para hablar/mostrar al paciente. */
+/**
+ * Formatea un instante en la timezone de la clínica para hablar/mostrar al
+ * paciente, en español natural ("a las 3 de la tarde") en vez de notación
+ * a.m./p.m. — el modelo tiende a repetir el string tal cual, y "p.m." se
+ * lee mal o en inglés en la síntesis de voz.
+ */
 export function formatLocal(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
+  const datePart = new Intl.DateTimeFormat("es-MX", {
     timeZone,
     weekday: "long",
     day: "numeric",
     month: "long",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
   }).format(date);
+
+  const timeParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour24 = Number(timeParts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = timeParts.find((p) => p.type === "minute")?.value ?? "00";
+
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const period = hour24 < 12 ? "de la mañana" : hour24 < 19 ? "de la tarde" : "de la noche";
+  const minuteText = minute === "00" ? "" : ` y ${minute}`;
+
+  return `${datePart}, a las ${hour12}${minuteText} ${period}`;
 }
 
 export interface BusyRange {

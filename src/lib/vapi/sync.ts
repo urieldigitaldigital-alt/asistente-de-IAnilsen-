@@ -11,7 +11,7 @@ function getAppUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-function buildVoice(voice: { provider: string; voiceId: string; speed?: number }): Vapi.CreateAssistantDtoVoice {
+function buildVoice(voice: { provider: string; voiceId: string; speed?: number; model?: string }): Vapi.CreateAssistantDtoVoice {
   const provider = voice.provider || process.env.VAPI_DEFAULT_VOICE_PROVIDER || "azure";
   const voiceId = voice.voiceId || process.env.VAPI_DEFAULT_VOICE_ID || "es-MX-DaliaNeural";
   // Un poco más rápido que el 1.0 nativo de Azure por defecto: se siente más
@@ -20,6 +20,19 @@ function buildVoice(voice: { provider: string; voiceId: string; speed?: number }
 
   if (provider === "azure") {
     return { provider: "azure", voiceId: voiceId as Vapi.AzureVoiceId, speed };
+  }
+  if (provider === "11labs") {
+    return {
+      provider: "11labs",
+      voiceId: voiceId as Vapi.ElevenLabsVoiceId,
+      // turbo_v2_5 es el único modelo que soporta forzar el idioma (español),
+      // evitando que ElevenLabs detecte mal el idioma en frases cortas.
+      model: (voice.model as Vapi.ElevenLabsVoiceModel) || "eleven_turbo_v2_5",
+      language: "es",
+      speed,
+      stability: 0.5,
+      similarityBoost: 0.75,
+    };
   }
   // Fallback razonable: voz propia de Vapi si se configuró un provider no soportado aún.
   return { provider: "vapi", voiceId: voiceId as Vapi.VapiVoiceVoiceId };

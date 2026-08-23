@@ -79,7 +79,12 @@ export const agentConfigFormSchema = z.object({
   clinic_info: clinicInfoSchema,
   services: z.array(clinicServiceSchema),
   business_hours: businessHoursSchema,
-  voice: z.object({ provider: z.string(), voiceId: z.string(), speed: z.number().min(0.5).max(2).optional() }),
+  voice: z.object({
+    provider: z.string(),
+    voiceId: z.string(),
+    speed: z.number().min(0.5).max(2).optional(),
+    model: z.string().optional(),
+  }),
   language: z.string(),
   model: z.object({ provider: z.string(), model: z.string() }),
   first_message: z.string(),

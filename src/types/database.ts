@@ -29,8 +29,10 @@ export interface ClinicInfo {
 export interface AgentVoiceConfig {
   provider: string;
   voiceId: string;
-  /** Multiplicador de velocidad de habla (1 = normal). Solo aplica al provider azure. */
+  /** Multiplicador de velocidad de habla (1 = normal). Aplica a azure y 11labs. */
   speed?: number;
+  /** Modelo de síntesis. Solo aplica al provider 11labs (ej. "eleven_turbo_v2_5"). */
+  model?: string;
 }
 
 export interface AgentModelConfig {
