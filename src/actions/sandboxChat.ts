@@ -2,7 +2,9 @@
 
 import type { Vapi } from "@vapi-ai/server-sdk";
 
-import { getVapiClient } from "@/lib/vapi/client";
+import { createClient } from "@/lib/supabase/server";
+import { getTenantVapiClient } from "@/lib/vapi/credentials";
+import { friendlyVapiError } from "@/lib/vapi/friendlyError";
 
 export interface SandboxChatResult {
   reply: string;
@@ -25,7 +27,13 @@ export async function sendSandboxMessageAction(
   }
 
   try {
-    const vapi = getVapiClient();
+    const supabase = await createClient();
+    const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
+    if (clinicError || !clinic) {
+      return { reply: "", chatId: previousChatId, error: "No se encontró el negocio del usuario." };
+    }
+
+    const vapi = await getTenantVapiClient(clinic.id, supabase);
     const response = await vapi.chats.create({
       input: message,
       previousChatId: previousChatId ?? undefined,
@@ -53,6 +61,6 @@ export async function sendSandboxMessageAction(
     };
   } catch (err) {
     console.error("Error en sandbox de chat de VAPI:", err);
-    return { reply: "", chatId: previousChatId, error: err instanceof Error ? err.message : "Error al probar el prompt." };
+    return { reply: "", chatId: previousChatId, error: friendlyVapiError(err, "Error al probar el prompt.") };
   }
 }

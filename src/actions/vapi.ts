@@ -2,12 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 
+import { saveVapiApiKey } from "@/lib/vapi/credentials";
+import { friendlyVapiError } from "@/lib/vapi/friendlyError";
 import { importTwilioNumber, linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
-import { twilioImportFormSchema, vapiPhoneNumberFormSchema } from "@/lib/validation";
+import { twilioImportFormSchema, vapiApiKeyFormSchema, vapiPhoneNumberFormSchema } from "@/lib/validation";
 
 export interface VapiActionState {
   error: string | null;
   success: string | null;
+}
+
+export async function saveVapiApiKeyAction(
+  _prevState: VapiActionState,
+  formData: FormData
+): Promise<VapiActionState> {
+  const parsed = vapiApiKeyFormSchema.safeParse({ apiKey: formData.get("apiKey") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Clave de API inválida.", success: null };
+  }
+
+  try {
+    await saveVapiApiKey(parsed.data.apiKey);
+    revalidatePath("/integraciones");
+    revalidatePath("/personalizacion");
+    return { error: null, success: "Cuenta de VAPI conectada." };
+  } catch (err) {
+    console.error("Error guardando la clave de VAPI del negocio.");
+    return { error: friendlyVapiError(err, "No se pudo guardar la clave de VAPI."), success: null };
+  }
 }
 
 export async function publishAssistantAction(
@@ -25,7 +47,7 @@ export async function publishAssistantAction(
     };
   } catch (err) {
     console.error("Error publicando el asistente en VAPI:", err);
-    return { error: err instanceof Error ? err.message : "No se pudo publicar el asistente.", success: null };
+    return { error: friendlyVapiError(err, "No se pudo publicar el asistente."), success: null };
   }
 }
 
@@ -45,7 +67,7 @@ export async function provisionVapiNumberAction(
     };
   } catch (err) {
     console.error("Error obteniendo un número de VAPI:", err);
-    return { error: err instanceof Error ? err.message : "No se pudo obtener el número.", success: null };
+    return { error: friendlyVapiError(err, "No se pudo obtener el número."), success: null };
   }
 }
 
@@ -71,9 +93,9 @@ export async function importTwilioNumberAction(
       success: result.number ? `Número de Twilio importado: ${result.number}` : "Número de Twilio importado y vinculado.",
     };
   } catch (err) {
-    // No loguear `err` completo si pudiera incluir el auth token en el mensaje de VAPI.
+    // No loguear `err` completo: el mensaje de VAPI podría incluir el auth token.
     console.error("Error importando número de Twilio a VAPI.");
-    return { error: err instanceof Error ? err.message : "No se pudo importar el número de Twilio.", success: null };
+    return { error: friendlyVapiError(err, "No se pudo importar el número de Twilio."), success: null };
   }
 }
 
@@ -93,6 +115,6 @@ export async function linkPhoneNumberAction(
     return { error: null, success: "Número vinculado al asistente." };
   } catch (err) {
     console.error("Error vinculando el número de VAPI:", err);
-    return { error: err instanceof Error ? err.message : "No se pudo vincular el número.", success: null };
+    return { error: friendlyVapiError(err, "No se pudo vincular el número."), success: null };
   }
 }

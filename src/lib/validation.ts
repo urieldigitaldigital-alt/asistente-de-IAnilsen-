@@ -112,6 +112,10 @@ export const vapiPhoneNumberFormSchema = z.object({
   phoneNumberId: z.string().uuid(),
 });
 
+export const vapiApiKeyFormSchema = z.object({
+  apiKey: z.string().uuid("La clave de API de VAPI no tiene el formato esperado."),
+});
+
 export const twilioImportFormSchema = z.object({
   number: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
   twilioAccountSid: z.string().regex(/^AC[a-zA-Z0-9]{32}$/, "Account SID de Twilio inválido (empieza con 'AC')."),

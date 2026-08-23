@@ -20,10 +20,12 @@ export function VapiNumberCard({
   assistantId,
   phoneNumberId,
   phoneNumber,
+  vapiConnected,
 }: {
   assistantId: string | null;
   phoneNumberId: string | null;
   phoneNumber: string | null;
+  vapiConnected: boolean;
 }) {
   const [provisionState, provisionAction, provisionPending] = useActionState(provisionVapiNumberAction, idleState);
   const [twilioState, twilioAction, twilioPending] = useActionState(importTwilioNumberAction, idleState);
@@ -58,14 +60,17 @@ export function VapiNumberCard({
         </p>
       </div>
 
-      {!assistantId && (
+      {!vapiConnected && (
+        <p className="text-sm text-muted">Conectá tu cuenta de VAPI arriba antes de publicar el asistente.</p>
+      )}
+      {vapiConnected && !assistantId && (
         <p className="text-sm text-muted">
           Publica el asistente desde Personalización antes de obtener un número.
         </p>
       )}
 
       <form action={provisionAction}>
-        <Button type="submit" disabled={provisionPending || !assistantId} className="w-full">
+        <Button type="submit" disabled={provisionPending || !assistantId || !vapiConnected} className="w-full">
           {provisionPending ? "Obteniendo número…" : phoneNumberId ? "Obtener otro número (EE.UU.)" : "Obtener número automáticamente (EE.UU.)"}
         </Button>
         {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
@@ -99,7 +104,7 @@ export function VapiNumberCard({
               <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
               <Input id="twilioAuthToken" name="twilioAuthToken" type="password" autoComplete="off" required />
             </div>
-            <Button type="submit" variant="secondary" disabled={twilioPending || !assistantId} className="w-full">
+            <Button type="submit" variant="secondary" disabled={twilioPending || !assistantId || !vapiConnected} className="w-full">
               {twilioPending ? "Importando…" : "Importar y vincular"}
             </Button>
             {twilioState.error && <p className="text-sm text-danger">{twilioState.error}</p>}
@@ -130,7 +135,7 @@ export function VapiNumberCard({
             <Label htmlFor="phoneNumberId">UUID del número en VAPI</Label>
             <div className="flex gap-2">
               <Input id="phoneNumberId" name="phoneNumberId" placeholder="00000000-0000-0000-0000-000000000000" required />
-              <Button type="submit" variant="secondary" disabled={linkPending || !assistantId}>
+              <Button type="submit" variant="secondary" disabled={linkPending || !assistantId || !vapiConnected}>
                 {linkPending ? "Vinculando…" : "Vincular"}
               </Button>
             </div>
@@ -141,7 +146,7 @@ export function VapiNumberCard({
       </div>
 
       <form action={publishAction}>
-        <Button type="submit" variant="ghost" disabled={publishPending}>
+        <Button type="submit" variant="ghost" disabled={publishPending || !vapiConnected}>
           {publishPending ? "Sincronizando…" : "Sincronizar ahora con VAPI"}
         </Button>
         {publishState.error && <p className="mt-1 text-sm text-danger">{publishState.error}</p>}

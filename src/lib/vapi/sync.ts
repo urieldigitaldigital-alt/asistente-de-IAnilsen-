@@ -1,7 +1,7 @@
 import type { Vapi } from "@vapi-ai/server-sdk";
 
 import { createClient } from "@/lib/supabase/server";
-import { getVapiClient } from "@/lib/vapi/client";
+import { getTenantVapiClient } from "@/lib/vapi/credentials";
 import { buildFirstMessage, buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
 
@@ -95,7 +95,7 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
   const firstMessage = buildFirstMessage(config, clinic);
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined });
 
-  const vapi = getVapiClient();
+  const vapi = await getTenantVapiClient(clinic.id, supabase);
   const payload = {
     name: clinic.name.slice(0, 40),
     firstMessage,
@@ -174,7 +174,7 @@ export async function provisionVapiNumber(): Promise<ProvisionedPhoneNumber> {
     throw new Error("Publica el asistente antes de obtener un número.");
   }
 
-  const vapi = getVapiClient();
+  const vapi = await getTenantVapiClient(clinic.id, supabase);
   const phoneNumber = await vapi.phoneNumbers.create({
     provider: "vapi",
     name: clinic.name.slice(0, 40),
@@ -221,7 +221,7 @@ export async function importTwilioNumber(params: TwilioImportParams): Promise<Pr
     throw new Error("Publica el asistente antes de importar un número.");
   }
 
-  const vapi = getVapiClient();
+  const vapi = await getTenantVapiClient(clinic.id, supabase);
   const phoneNumber = await vapi.phoneNumbers.create({
     provider: "twilio",
     number: params.number,
@@ -253,7 +253,7 @@ export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
     throw new Error("Publica el asistente antes de vincular un número.");
   }
 
-  const vapi = getVapiClient();
+  const vapi = await getTenantVapiClient(config.clinic_id, supabase);
   const phoneNumber = await vapi.phoneNumbers.get({ id: phoneNumberId });
 
   await vapi.phoneNumbers.update({
@@ -269,9 +269,13 @@ export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
 }
 
 /** Trae los dígitos del número (para mostrarlo en Integraciones) — puede ser null mientras se está activando. */
-export async function getPhoneNumberDigits(phoneNumberId: string): Promise<string | null> {
-  const vapi = getVapiClient();
+export async function getPhoneNumberDigits(
+  clinicId: string,
+  phoneNumberId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
   try {
+    const vapi = await getTenantVapiClient(clinicId, supabase);
     const phoneNumber = await vapi.phoneNumbers.get({ id: phoneNumberId });
     return "number" in phoneNumber ? (phoneNumber.number ?? null) : null;
   } catch (err) {

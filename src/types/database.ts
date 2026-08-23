@@ -118,6 +118,19 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["google_credentials"]["Row"]>;
         Relationships: [];
       };
+      vapi_credentials: {
+        Row: {
+          clinic_id: string;
+          api_key_encrypted: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["vapi_credentials"]["Row"]> & {
+          clinic_id: string;
+          api_key_encrypted: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["vapi_credentials"]["Row"]>;
+        Relationships: [];
+      };
       calls: {
         Row: {
           id: string;
@@ -201,6 +214,7 @@ export type Clinic = Database["public"]["Tables"]["clinics"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type AgentConfig = Database["public"]["Tables"]["agent_configs"]["Row"];
 export type GoogleCredentials = Database["public"]["Tables"]["google_credentials"]["Row"];
+export type VapiCredentials = Database["public"]["Tables"]["vapi_credentials"]["Row"];
 export type Call = Database["public"]["Tables"]["calls"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];

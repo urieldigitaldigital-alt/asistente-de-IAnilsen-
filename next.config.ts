@@ -7,7 +7,8 @@ const REQUIRED_ENV_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "VAPI_API_KEY",
+  // VAPI_API_KEY ya no es global: cada negocio conecta su propia clave desde
+  // Integraciones (tabla vapi_credentials, cifrada).
   "VAPI_WEBHOOK_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
