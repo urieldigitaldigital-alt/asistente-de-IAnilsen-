@@ -20,8 +20,9 @@ export async function saveWhatsappCredentialsAction(
 ): Promise<WhatsappActionState> {
   const parsed = whatsappCredentialsFormSchema.safeParse({
     whatsappNumber: formData.get("whatsappNumber"),
-    twilioAccountSid: formData.get("twilioAccountSid"),
-    twilioAuthToken: formData.get("twilioAuthToken"),
+    metaPhoneNumberId: formData.get("metaPhoneNumberId"),
+    metaAccessToken: formData.get("metaAccessToken"),
+    metaVerifyToken: formData.get("metaVerifyToken"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos.", success: null };

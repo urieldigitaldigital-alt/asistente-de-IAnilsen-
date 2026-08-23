@@ -144,42 +144,55 @@ export function IntegrationsGuide() {
         </div>
         <div className="space-y-2 pl-1">
           <p className="text-sm text-muted">
-            El mismo asistente responde automáticamente por WhatsApp. Usá Twilio (no hace falta crear ninguna cuenta en
-            Meta/Facebook — Twilio se encarga de esa parte) — podés usar el mismo número que ya compraste para llamadas.
+            El mismo asistente responde automáticamente por WhatsApp. Usamos la API directa de Meta — te dan un número de
+            prueba gratis al instante, sin esperar aprobación.
           </p>
-          <Step number={1} title="En la Consola de Twilio">
-            tocá la lupa de <b>&quot;Search&quot;</b> arriba del menú izquierdo y escribí{" "}
-            <b>&quot;WhatsApp senders&quot;</b> (o entrá directo con{" "}
+          <Step number={1} title="Entrá a">
+            {" "}
             <a
-              href="https://console.twilio.com/us1/develop/sms/senders/whatsapp-senders"
+              href="https://developers.facebook.com"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline"
             >
-              este enlace
-            </a>
-            ).
+              developers.facebook.com
+            </a>{" "}
+            e iniciá sesión con tu cuenta de Facebook.
           </Step>
-          <Step number={2} title="Tocá el botón para agregar un remitente nuevo">
-            (&quot;New WhatsApp Sender&quot; o &quot;+&quot;), elegí tu número ya comprado en Twilio, y completá los datos
-            del negocio que te pida (nombre, sitio web, categoría).
+          <Step number={2} title="Si te aparece un aviso de seguridad ('No puedes realizar el cambio en este momento')">
+            probá primero entrar a facebook.com normal, navegar un poco, y volver a intentar — o probá desde el navegador
+            del celular donde ya estés logueado habitualmente.
           </Step>
-          <Step number={3} title="Enviá para aprobación.">
-            Twilio lo manda a revisar (por atrás lo aprueba Meta, pero vos no interactuás con Meta en ningún momento) —
-            puede tardar de horas a un par de días.
+          <Step number={3} title="Creá una App nueva">
+            (botón &quot;Create App&quot;), elegí el tipo &quot;Business&quot;, y dentro agregá el producto
+            &quot;WhatsApp&quot;.
           </Step>
-          <Step number={4} title="En la configuración de ese remitente de WhatsApp, buscá">
-            &quot;When a message comes in&quot; (webhook) y pegá esta URL:
+          <Step number={4} title="En la sección &quot;API Setup&quot; de WhatsApp vas a ver">
+            un número de prueba ya creado, con su <b>Phone Number ID</b> y un <b>Temporary access token</b> — copiá los dos.
+          </Step>
+          <Step number={5} title="En esa misma pantalla, agregá tu propio celular">
+            como número de prueba destinatario (&quot;To&quot;) y verificalo con el código que te llega.
+          </Step>
+          <Step number={6} title="Inventá una palabra cualquiera">
+            (por ejemplo &quot;asistente2026&quot;) — la vas a usar como &quot;Verify Token&quot; en el próximo paso y en
+            el panel.
+          </Step>
+          <Step number={7} title="Buscá la sección &quot;Configuration&quot; → &quot;Webhook&quot;">
+            y pegá esta URL de Callback:
           </Step>
           <p className="ml-9 select-all break-all rounded-lg border border-border bg-black/5 px-3 py-2 font-mono text-xs dark:bg-white/5">
             {webhookUrl}
           </p>
-          <Step number={5} title="Volvé a esta página, en la tarjeta">
-            &quot;WhatsApp&quot; de más abajo, pegá tu número, el Account SID y el Auth Token de Twilio (los mismos del
-            paso 3 de arriba si ya los usaste), y tocá &quot;Conectar WhatsApp&quot;.
+          <Step number={8} title="En el campo &quot;Verify token&quot; pegá">
+            la misma palabra que inventaste en el paso 6, y guardá. Después suscribite al campo &quot;messages&quot;.
           </Step>
-          <Step number={6} title="Listo:">
-            en cuanto Twilio apruebe el remitente, mandale un WhatsApp a ese número y el asistente te va a contestar solo.
+          <Step number={9} title="Volvé a esta página, en la tarjeta">
+            &quot;WhatsApp&quot; de más abajo, completá el número de prueba, el Phone Number ID, el Access Token y la
+            misma palabra de Verify Token, y tocá &quot;Conectar WhatsApp&quot;.
+          </Step>
+          <Step number={10} title="Listo:">
+            mandale un WhatsApp desde tu celular (el que verificaste) a ese número de prueba, y el asistente te va a
+            contestar solo.
           </Step>
         </div>
       </div>
