@@ -27,6 +27,9 @@ export interface DashboardData {
   googleConnected: boolean;
   vapiAssistantId: string | null;
   vapiPhoneNumberId: string | null;
+  whatsappMessagesToday: number;
+  whatsappConversationsActive: number;
+  whatsappNeedsFollowUp: number;
 }
 
 function startOfDay(date: Date): Date {
@@ -53,6 +56,9 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     recentCallsRes,
     configRes,
     googleRes,
+    whatsappMessagesTodayRes,
+    whatsappActiveRes,
+    whatsappFollowUpRes,
   ] = await Promise.all([
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
@@ -70,6 +76,9 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
       .limit(5),
     supabase.from("agent_configs").select("vapi_assistant_id, vapi_phone_number_id").single(),
     supabase.from("google_credentials").select("clinic_id").maybeSingle(),
+    supabase.from("whatsapp_messages").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
+    supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "needs_follow_up"),
   ]);
 
   const weekCalls = weekCallsRes.data ?? [];
@@ -124,5 +133,8 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     googleConnected: Boolean(googleRes.data),
     vapiAssistantId: configRes.data?.vapi_assistant_id ?? null,
     vapiPhoneNumberId: configRes.data?.vapi_phone_number_id ?? null,
+    whatsappMessagesToday: whatsappMessagesTodayRes.count ?? 0,
+    whatsappConversationsActive: whatsappActiveRes.count ?? 0,
+    whatsappNeedsFollowUp: whatsappFollowUpRes.count ?? 0,
   };
 }

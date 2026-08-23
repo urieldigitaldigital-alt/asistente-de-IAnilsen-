@@ -1,4 +1,12 @@
-import { CalendarCheckIcon, ClockIcon, PhoneIcon, TrendUpIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  CalendarCheckIcon,
+  ChatsCircleIcon,
+  ClockIcon,
+  PhoneIcon,
+  TrendUpIcon,
+  WarningCircleIcon,
+  WhatsappLogoIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 
 import { CallsChart } from "@/components/dashboard/CallsChart";
@@ -35,6 +43,15 @@ export default async function DashboardPage() {
           label="Tasa de agendamiento"
           value={data.bookingRatePct !== null ? `${data.bookingRatePct}%` : "—"}
         />
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold">WhatsApp</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatTile icon={ChatsCircleIcon} label="Mensajes hoy" value={String(data.whatsappMessagesToday)} />
+          <StatTile icon={WhatsappLogoIcon} label="Conversaciones activas" value={String(data.whatsappConversationsActive)} />
+          <StatTile icon={WarningCircleIcon} label="Necesitan seguimiento" value={String(data.whatsappNeedsFollowUp)} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
