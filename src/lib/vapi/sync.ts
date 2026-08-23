@@ -100,6 +100,15 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
       "hasta pronto",
       "que tengas buen día",
     ],
+    // Por defecto VAPI corta al asistente con solo 0.2s de cualquier sonido
+    // de voz (ni una palabra completa) — eso lo interrumpía con ruido de
+    // fondo o pausas del paciente. Exigimos al menos 2 palabras reales antes
+    // de considerarlo una interrupción genuina.
+    stopSpeakingPlan: {
+      numWords: 2,
+      voiceSeconds: 0.3,
+      backoffSeconds: 1,
+    },
   };
 
   let assistantId = config.vapi_assistant_id;
