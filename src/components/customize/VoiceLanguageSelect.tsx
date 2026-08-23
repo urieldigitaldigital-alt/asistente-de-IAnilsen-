@@ -22,12 +22,14 @@ const LANGUAGES = [
   { code: "en", label: "Inglés" },
 ];
 
+// ElevenLabs solo acepta velocidad entre 0.7x y 1.2x (VAPI rechaza fuera de
+// ese rango con un 400); Azure admite hasta 1.5x. Filtramos según el proveedor.
 const SPEED_OPTIONS = [
   { value: 0.9, label: "Más lento (0.9x)" },
   { value: 1, label: "Normal (1x)" },
   { value: 1.15, label: "Un poco más rápido (1.15x)" },
-  { value: 1.3, label: "Rápido (1.3x)" },
-  { value: 1.5, label: "Muy rápido (1.5x)" },
+  { value: 1.3, label: "Rápido (1.3x)", azureOnly: true },
+  { value: 1.5, label: "Muy rápido (1.5x)", azureOnly: true },
 ];
 
 interface VoiceLanguageSelectProps {
@@ -72,6 +74,9 @@ export function VoiceLanguageSelect({
               // Al cambiar de proveedor, el voiceId de Azure no sirve para
               // ElevenLabs (y viceversa) — reseteamos a un valor válido.
               onVoiceIdChange(nextProvider === "11labs" ? "" : AZURE_SPANISH_VOICES[0].id);
+              // ElevenLabs no acepta velocidades > 1.2x — VAPI devuelve un 400
+              // si se publica con un valor heredado de Azure fuera de rango.
+              if (nextProvider === "11labs" && speed > 1.2) onSpeedChange(1.15);
             }}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
@@ -119,7 +124,7 @@ export function VoiceLanguageSelect({
             onChange={(e) => onSpeedChange(Number(e.target.value))}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            {SPEED_OPTIONS.map((opt) => (
+            {SPEED_OPTIONS.filter((opt) => !isElevenLabs || !opt.azureOnly).map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -148,8 +153,8 @@ export function VoiceLanguageSelect({
       </div>
       {isElevenLabs ? (
         <p className="text-xs text-muted-foreground">
-          Necesitas conectar tu propia cuenta de ElevenLabs una sola vez desde el dashboard de VAPI (Settings → Provider Keys → 11Labs),
-          y pegar aquí el &quot;Voice ID&quot; de una voz en español copiado desde la Voice Library de ElevenLabs.
+          Pegá aquí el &quot;Voice ID&quot; de una voz en español copiado desde la Voice Library de tu cuenta de ElevenLabs. Velocidad
+          máxima admitida para ElevenLabs: 1.2x.
         </p>
       ) : null}
     </Card>

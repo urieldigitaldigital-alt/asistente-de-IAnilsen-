@@ -24,12 +24,16 @@ function buildVoice(voice: { provider: string; voiceId: string; speed?: number; 
   if (provider === "11labs") {
     return {
       provider: "11labs",
-      voiceId: voiceId as Vapi.ElevenLabsVoiceId,
+      // Los IDs de voz vienen del campo de texto libre "Voice ID de
+      // ElevenLabs" — recortamos espacios accidentales al copiar/pegar.
+      voiceId: voiceId.trim() as Vapi.ElevenLabsVoiceId,
       // turbo_v2_5 es el único modelo que soporta forzar el idioma (español),
       // evitando que ElevenLabs detecte mal el idioma en frases cortas.
       model: (voice.model as Vapi.ElevenLabsVoiceModel) || "eleven_turbo_v2_5",
       language: "es",
-      speed,
+      // ElevenLabs solo acepta 0.7x-1.2x; VAPI rechaza (400) cualquier valor
+      // fuera de rango heredado del selector de Azure (hasta 1.5x).
+      speed: Math.min(1.2, Math.max(0.7, speed)),
       stability: 0.5,
       similarityBoost: 0.75,
     };
