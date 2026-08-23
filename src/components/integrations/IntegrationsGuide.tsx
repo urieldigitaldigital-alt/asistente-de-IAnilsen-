@@ -4,6 +4,7 @@ import {
   ListNumbersIcon,
   PhoneIcon,
   RocketLaunchIcon,
+  WhatsappLogoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import type { ReactNode } from "react";
 
@@ -23,6 +24,8 @@ function Step({ number, title, children }: { number: number; title: string; chil
 }
 
 export function IntegrationsGuide() {
+  const webhookUrl = `${(process.env.APP_URL || "").replace(/\/$/, "")}/api/whatsapp/webhook`;
+
   return (
     <Card className="space-y-6">
       <div className="flex items-center gap-2">
@@ -30,7 +33,7 @@ export function IntegrationsGuide() {
         <h2 className="text-sm font-semibold">Guía paso a paso: cómo dejar todo funcionando</h2>
       </div>
       <p className="text-sm text-muted">
-        Seguí estos 4 pasos en orden. No hace falta saber de tecnología — es solo copiar, pegar y hacer clic. Si te trabás en
+        Seguí estos 5 pasos en orden. No hace falta saber de tecnología — es solo copiar, pegar y hacer clic. Si te trabás en
         algún paso, mandá una captura de pantalla para que te ayuden.
       </p>
 
@@ -131,6 +134,35 @@ export function IntegrationsGuide() {
           </Step>
           <Step number={4} title="Listo:">
             va a aparecer &quot;Conectado&quot; en esa tarjeta.
+          </Step>
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-border pt-4">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <WhatsappLogoIcon size={16} className="text-primary" weight="fill" /> 5. Activá WhatsApp (opcional)
+        </div>
+        <div className="space-y-2 pl-1">
+          <p className="text-sm text-muted">
+            El mismo asistente responde automáticamente por WhatsApp. Necesitás un número de WhatsApp habilitado en Twilio
+            (puede ser el mismo que usaste para llamadas, o uno nuevo).
+          </p>
+          <Step number={1} title="En la Consola de Twilio, andá a">
+            &quot;Messaging&quot; → &quot;Senders&quot; → &quot;WhatsApp senders&quot; y registrá tu número (o usá el modo
+            &quot;Sandbox&quot; para probar gratis en minutos).
+          </Step>
+          <Step number={2} title="En la configuración de ese número de WhatsApp, buscá">
+            &quot;When a message comes in&quot; (webhook) y pegá esta URL:
+          </Step>
+          <p className="ml-9 select-all break-all rounded-lg border border-border bg-black/5 px-3 py-2 font-mono text-xs dark:bg-white/5">
+            {webhookUrl}
+          </p>
+          <Step number={3} title="Volvé a esta página, en la tarjeta">
+            &quot;WhatsApp&quot; de más abajo, pegá tu número de WhatsApp, el Account SID y el Auth Token de Twilio, y tocá
+            &quot;Conectar WhatsApp&quot;.
+          </Step>
+          <Step number={4} title="Listo:">
+            mandale un mensaje de WhatsApp a ese número y el asistente te va a contestar solo.
           </Step>
         </div>
       </div>

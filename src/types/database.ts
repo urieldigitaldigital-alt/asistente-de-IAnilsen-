@@ -131,6 +131,40 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["vapi_credentials"]["Row"]>;
         Relationships: [];
       };
+      whatsapp_credentials: {
+        Row: {
+          clinic_id: string;
+          twilio_account_sid: string;
+          twilio_auth_token_encrypted: string;
+          whatsapp_number: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]> & {
+          clinic_id: string;
+          twilio_account_sid: string;
+          twilio_auth_token_encrypted: string;
+          whatsapp_number: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]>;
+        Relationships: [];
+      };
+      whatsapp_sessions: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          customer_phone: string;
+          vapi_session_id: string;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["whatsapp_sessions"]["Row"]> & {
+          clinic_id: string;
+          customer_phone: string;
+          vapi_session_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["whatsapp_sessions"]["Row"]>;
+        Relationships: [];
+      };
       calls: {
         Row: {
           id: string;
@@ -215,6 +249,8 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type AgentConfig = Database["public"]["Tables"]["agent_configs"]["Row"];
 export type GoogleCredentials = Database["public"]["Tables"]["google_credentials"]["Row"];
 export type VapiCredentials = Database["public"]["Tables"]["vapi_credentials"]["Row"];
+export type WhatsappCredentials = Database["public"]["Tables"]["whatsapp_credentials"]["Row"];
+export type WhatsappSession = Database["public"]["Tables"]["whatsapp_sessions"]["Row"];
 export type Call = Database["public"]["Tables"]["calls"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];

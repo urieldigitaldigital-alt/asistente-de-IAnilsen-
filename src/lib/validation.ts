@@ -122,6 +122,12 @@ export const twilioImportFormSchema = z.object({
   twilioAuthToken: z.string().min(20, "Auth Token de Twilio inválido."),
 });
 
+export const whatsappCredentialsFormSchema = z.object({
+  whatsappNumber: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
+  twilioAccountSid: z.string().regex(/^AC[a-zA-Z0-9]{32}$/, "Account SID de Twilio inválido (empieza con 'AC')."),
+  twilioAuthToken: z.string().min(20, "Auth Token de Twilio inválido."),
+});
+
 // ---------------------------------------------------------------------------
 // VAPI webhook envelope
 // ---------------------------------------------------------------------------
@@ -148,6 +154,13 @@ export const vapiWebhookMessageSchema = z.object({
         phoneNumberId: z.string().optional(),
         assistantId: z.string().optional(),
         customer: z.object({ number: z.string().optional() }).optional(),
+      })
+      .optional(),
+    // Presente en tool-calls disparados desde la Chat API (ej. WhatsApp) en vez de una llamada.
+    chat: z
+      .object({
+        id: z.string().optional(),
+        assistantId: z.string().optional(),
       })
       .optional(),
     toolCallList: z.array(vapiToolCallSchema).optional(),

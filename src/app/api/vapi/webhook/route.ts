@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
   const { message } = parsedBody.data;
 
   const phoneNumberId = message.call?.phoneNumberId;
-  const assistantId = message.call?.assistantId;
+  // Para tool-calls disparados desde WhatsApp (Chat API) no hay `call`, solo `chat`.
+  const assistantId = message.call?.assistantId ?? message.chat?.assistantId;
   const vapiCallId = message.call?.id;
   const customerNumber = message.call?.customer?.number ?? null;
 
