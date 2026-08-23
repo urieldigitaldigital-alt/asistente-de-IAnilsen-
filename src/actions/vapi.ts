@@ -10,8 +10,6 @@ export interface VapiActionState {
   success: string | null;
 }
 
-const idleState: VapiActionState = { error: null, success: null };
-
 export async function publishAssistantAction(
   _prevState: VapiActionState,
   _formData: FormData
@@ -50,5 +48,3 @@ export async function linkPhoneNumberAction(
     return { error: err instanceof Error ? err.message : "No se pudo vincular el número.", success: null };
   }
 }
-
-export { idleState as vapiIdleState };

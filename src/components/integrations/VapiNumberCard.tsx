@@ -3,10 +3,12 @@
 import { CheckCircleIcon, PhoneIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useActionState } from "react";
 
-import { linkPhoneNumberAction, publishAssistantAction, vapiIdleState } from "@/actions/vapi";
+import { linkPhoneNumberAction, publishAssistantAction, type VapiActionState } from "@/actions/vapi";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
+
+const idleState: VapiActionState = { error: null, success: null };
 
 export function VapiNumberCard({
   assistantId,
@@ -15,8 +17,8 @@ export function VapiNumberCard({
   assistantId: string | null;
   phoneNumberId: string | null;
 }) {
-  const [linkState, linkAction, linkPending] = useActionState(linkPhoneNumberAction, vapiIdleState);
-  const [publishState, publishAction, publishPending] = useActionState(publishAssistantAction, vapiIdleState);
+  const [linkState, linkAction, linkPending] = useActionState(linkPhoneNumberAction, idleState);
+  const [publishState, publishAction, publishPending] = useActionState(publishAssistantAction, idleState);
 
   return (
     <Card className="space-y-4">
