@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { GoogleCalendarCard } from "@/components/integrations/GoogleCalendarCard";
+import { IntegrationsGuide } from "@/components/integrations/IntegrationsGuide";
 import { VapiAccountCard } from "@/components/integrations/VapiAccountCard";
 import { VapiNumberCard } from "@/components/integrations/VapiNumberCard";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,8 @@ export default async function IntegrationsPage({
         <h1 className="text-xl font-semibold">Integraciones</h1>
         <p className="text-sm text-muted">Conecta tu cuenta de VAPI, Google Calendar y tu número de teléfono.</p>
       </div>
+
+      <IntegrationsGuide />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <VapiAccountCard connected={vapiConnected} />
