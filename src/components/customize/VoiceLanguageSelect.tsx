@@ -8,6 +8,8 @@ const AZURE_SPANISH_VOICES = [
   { id: "es-MX-JorgeNeural", label: "Jorge (es-MX, hombre)" },
   { id: "es-ES-ElviraNeural", label: "Elvira (es-ES, mujer)" },
   { id: "es-ES-AlvaroNeural", label: "Álvaro (es-ES, hombre)" },
+  { id: "es-AR-ElenaNeural", label: "Elena (es-AR, mujer)" },
+  { id: "es-AR-TomasNeural", label: "Tomás (es-AR, hombre)" },
 ];
 
 const LANGUAGES = [
