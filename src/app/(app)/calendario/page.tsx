@@ -2,8 +2,7 @@ import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { CalendarAgenda } from "@/components/calendar/CalendarAgenda";
-import { Card } from "@/components/ui/Card";
+import { CalendarView } from "@/components/calendar/CalendarView";
 import { getCalendarMonthData, parseMonthParam, shiftMonthParam } from "@/lib/calendarData";
 import { createClient } from "@/lib/supabase/server";
 
@@ -56,9 +55,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </p>
       )}
 
-      <Card>
-        <CalendarAgenda appointments={appointments} externalEvents={externalEvents} timeZone={clinic.timezone} />
-      </Card>
+      <CalendarView
+        appointments={appointments}
+        externalEvents={externalEvents}
+        timeZone={clinic.timezone}
+        year={start.getUTCFullYear()}
+        month={start.getUTCMonth() + 1}
+      />
     </div>
   );
 }

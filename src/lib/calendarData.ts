@@ -1,14 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { listCalendarEvents } from "@/lib/google/calendar";
+import type { ExternalCalendarEvent } from "@/lib/calendarGrouping";
 import type { Appointment, Clinic, Database } from "@/types/database";
-
-export interface ExternalCalendarEvent {
-  id: string;
-  summary: string;
-  start: string | null;
-  htmlLink: string | null;
-}
 
 export interface CalendarMonthData {
   appointments: Appointment[];
