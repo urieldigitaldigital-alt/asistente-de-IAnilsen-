@@ -42,7 +42,7 @@ function getZonedParts(date: Date, timeZone: string): ZonedParts {
 }
 
 /** Convierte una hora "de pared" (año/mes/día/hora/minuto) en la timezone dada a un instante UTC real. */
-function zonedTimeToUtc(
+export function zonedTimeToUtc(
   year: number,
   month: number,
   day: number,
@@ -55,6 +55,27 @@ function zonedTimeToUtc(
   const asUtcOfParts = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
   const diffMs = asUtcOfParts - utcGuess.getTime();
   return new Date(utcGuess.getTime() - diffMs);
+}
+
+const OFFSET_SUFFIX_REGEX = /(Z|[+-]\d{2}:?\d{2})$/i;
+const NAIVE_DATETIME_REGEX = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
+
+/**
+ * Parsea una fecha/hora recibida de una tool de VAPI (el modelo casi nunca
+ * incluye offset/"Z", aunque el prompt se lo pida). Si trae offset, se
+ * interpreta tal cual; si no, se interpreta como hora de pared en la
+ * timezone de la clínica (que es lo que un paciente/agente quieren decir al
+ * hablar de "las 3 de la tarde"), evitando el corrimiento de horas que daría
+ * un `new Date(...)` ingenuo corriendo en un servidor en UTC.
+ */
+export function parseLocalDateTime(input: string, timeZone: string): Date {
+  if (OFFSET_SUFFIX_REGEX.test(input)) {
+    return new Date(input);
+  }
+  const match = input.match(NAIVE_DATETIME_REGEX);
+  if (!match) return new Date(input);
+  const [, year, month, day, hour, minute] = match;
+  return zonedTimeToUtc(Number(year), Number(month), Number(day), Number(hour), Number(minute), timeZone);
 }
 
 /** Formatea un instante en la timezone de la clínica para hablar/mostrar al paciente. */

@@ -37,7 +37,11 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
           type: "object",
           properties: {
             treatment: { type: "string", description: "Tratamiento solicitado (p. ej. limpieza, revisión, urgencia, ortodoncia)." },
-            datetime: { type: "string", description: "Fecha y hora solicitadas en formato ISO 8601." },
+            datetime: {
+              type: "string",
+              description:
+                "Fecha y hora solicitadas, en hora local de la clínica (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto de la clínica, nunca un año anterior.",
+            },
             durationMinutes: { type: "number", description: "Duración estimada de la cita en minutos." },
             daysAhead: { type: "number", description: "Días hacia adelante a considerar si no se pide una fecha exacta (1-30)." },
           },
@@ -52,7 +56,11 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
         parameters: {
           type: "object",
           properties: {
-            datetime: { type: "string", description: "Fecha y hora de la cita en formato ISO 8601." },
+            datetime: {
+              type: "string",
+              description:
+                "Fecha y hora de la cita, en hora local de la clínica (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto de la clínica, nunca un año anterior.",
+            },
             durationMinutes: { type: "number", description: "Duración de la cita en minutos." },
             patientName: { type: "string", description: "Nombre completo del paciente." },
             patientPhone: { type: "string", description: "Teléfono del paciente." },
@@ -76,7 +84,11 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
             eventId: { type: "string", description: "ID del evento de Google Calendar, si se conoce." },
             patientName: { type: "string", description: "Nombre del paciente." },
             patientPhone: { type: "string", description: "Teléfono del paciente." },
-            datetime: { type: "string", description: "Fecha y hora aproximadas de la cita a cancelar." },
+            datetime: {
+              type: "string",
+              description:
+                "Fecha y hora aproximadas de la cita a cancelar, en hora local de la clínica, formato AAAA-MM-DDTHH:MM:SS.",
+            },
           },
         },
       },

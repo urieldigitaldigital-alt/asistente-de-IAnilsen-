@@ -4,15 +4,22 @@ import { z } from "zod";
 // Tools de VAPI (payloads no confiables recibidos por el webhook)
 // ---------------------------------------------------------------------------
 
+// El modelo casi nunca manda un offset/"Z" aunque se le pida ISO 8601 completo
+// (manda algo como "2026-08-23T15:00:00"), así que aceptamos fecha/hora local
+// con o sin offset — se interpreta como hora de la clínica en parseLocalDateTime.
+const flexibleDatetime = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/, "Fecha/hora inválida");
+
 export const checkAvailabilitySchema = z.object({
   treatment: z.string().optional(),
-  datetime: z.string().datetime({ offset: true }).optional(),
+  datetime: flexibleDatetime.optional(),
   durationMinutes: z.number().positive().optional(),
   daysAhead: z.number().int().min(1).max(30).optional(),
 });
 
 export const bookAppointmentSchema = z.object({
-  datetime: z.string().datetime({ offset: true }),
+  datetime: flexibleDatetime,
   durationMinutes: z.number().positive(),
   patientName: z.string().min(1),
   patientPhone: z.string().min(1),
@@ -26,7 +33,7 @@ export const cancelAppointmentSchema = z.object({
   eventId: z.string().optional(),
   patientName: z.string().optional(),
   patientPhone: z.string().optional(),
-  datetime: z.string().datetime({ offset: true }).optional(),
+  datetime: flexibleDatetime.optional(),
 });
 
 export const requestHumanHandoffSchema = z.object({

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { findAvailability, formatLocal, type BusyRange } from "@/lib/availability";
+import { findAvailability, formatLocal, parseLocalDateTime, type BusyRange } from "@/lib/availability";
 import { deleteCalendarEvent, getFreeBusy, insertCalendarEvent } from "@/lib/google/calendar";
 import {
   bookAppointmentSchema,
@@ -19,6 +19,25 @@ export interface ToolHandlerContext {
   config: AgentConfig;
   /** id de la fila en `calls` para esta llamada (ya existe gracias al upsert previo al dispatch). */
   callRowId: string | null;
+}
+
+/**
+ * El modelo a veces "recuerda" un año de su corpus de entrenamiento en vez
+ * del año real (p. ej. pide "2024-08-24" cuando hoy es 2026). Si la fecha
+ * pedida cae en el pasado, la adelantamos año a año hasta la próxima
+ * ocurrencia futura de ese mismo mes/día/hora — asume que un paciente que
+ * llama nunca quiere agendar algo que ya pasó.
+ */
+function assumeFutureIntent(date: Date, now: Date): Date {
+  let candidate = date;
+  let guard = 0;
+  while (candidate.getTime() < now.getTime() - 24 * 60 * 60_000 && guard < 6) {
+    const next = new Date(candidate);
+    next.setUTCFullYear(next.getUTCFullYear() + 1);
+    candidate = next;
+    guard += 1;
+  }
+  return candidate;
 }
 
 function findServiceDuration(config: AgentConfig, treatment?: string): number {
@@ -49,8 +68,10 @@ async function handleCheckAvailability(ctx: ToolHandlerContext, rawArgs: unknown
   const { treatment, datetime, durationMinutes, daysAhead } = parsed.data;
 
   const duration = durationMinutes ?? findServiceDuration(ctx.config, treatment);
-  const requestedStart = datetime ? new Date(datetime) : undefined;
   const now = new Date();
+  const requestedStart = datetime
+    ? assumeFutureIntent(parseLocalDateTime(datetime, ctx.clinic.timezone), now)
+    : undefined;
   const windowEnd = new Date(now.getTime() + (daysAhead ?? 14) * 24 * 60 * 60_000);
 
   const [googleBusy, localBusy] = await Promise.all([
@@ -85,7 +106,7 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
     return "Faltan datos para agendar la cita. Necesito fecha y hora, duración, nombre completo, teléfono y tratamiento.";
   }
   const data = parsed.data;
-  const start = new Date(data.datetime);
+  const start = assumeFutureIntent(parseLocalDateTime(data.datetime, ctx.clinic.timezone), new Date());
   const end = new Date(start.getTime() + data.durationMinutes * 60_000);
 
   let googleEventId: string | null = null;
@@ -155,7 +176,7 @@ async function handleCancelAppointment(ctx: ToolHandlerContext, rawArgs: unknown
   if (patientPhone) query = query.eq("patient_phone", patientPhone);
   if (patientName) query = query.ilike("patient_name", `%${patientName}%`);
   if (datetime) {
-    const target = new Date(datetime);
+    const target = parseLocalDateTime(datetime, ctx.clinic.timezone);
     query = query
       .gte("start_time", new Date(target.getTime() - 60 * 60_000).toISOString())
       .lte("start_time", new Date(target.getTime() + 60 * 60_000).toISOString());

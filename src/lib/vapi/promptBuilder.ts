@@ -1,3 +1,4 @@
+import { formatLocal } from "@/lib/availability";
 import type { AgentConfig, BusinessHours, Clinic, ClinicService } from "@/types/database";
 
 const WEEKDAY_LABELS: Record<string, string> = {
@@ -21,6 +22,12 @@ function formatBusinessHours(hours: BusinessHours): string {
   return lines.join("\n");
 }
 
+function todayIsoDate(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date()
+  );
+}
+
 function formatServices(services: ClinicService[]): string {
   if (services.length === 0) return "- (sin tratamientos configurados)";
   return services
@@ -37,6 +44,8 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
   const sections: (string | null)[] = [
     config.system_prompt.trim() ||
       `Eres el asistente virtual de ${clinic.name}. Ayudas a los pacientes a agendar, consultar y cancelar citas, y respondes dudas frecuentes sobre la clínica.`,
+    "",
+    `Fecha y hora actuales en la clínica: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Usa siempre este año real al calcular cualquier fecha para las tools — nunca un año de otra época.`,
     "",
     "## Contexto de la clínica",
     `Nombre: ${clinic.name}`,
