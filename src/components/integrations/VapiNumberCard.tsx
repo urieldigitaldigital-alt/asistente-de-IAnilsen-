@@ -69,17 +69,35 @@ export function VapiNumberCard({
         </p>
       )}
 
-      <form action={provisionAction}>
-        <Button type="submit" disabled={provisionPending || !assistantId || !vapiConnected} className="w-full">
-          {provisionPending ? "Obteniendo número…" : phoneNumberId ? "Obtener otro número (EE.UU.)" : "Obtener número automáticamente (EE.UU.)"}
-        </Button>
-        {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
-        {provisionState.success && <p className="mt-2 text-sm text-primary">{provisionState.success}</p>}
-        <p className="mt-2 text-xs text-muted">
-          Crea y vincula un número al instante, sin salir de este panel. VAPI solo asigna números de EE.UU. — requiere una
-          tarjeta cargada en tu cuenta de VAPI (Settings → Billing).
-        </p>
-      </form>
+      {!phoneNumberId ? (
+        <form action={provisionAction}>
+          <Button type="submit" disabled={provisionPending || !assistantId || !vapiConnected} className="w-full">
+            {provisionPending ? "Obteniendo número…" : "Obtener número automáticamente (EE.UU.)"}
+          </Button>
+          {provisionState.error && <p className="mt-2 text-sm text-danger">{provisionState.error}</p>}
+          {provisionState.success && <p className="mt-2 text-sm text-primary">{provisionState.success}</p>}
+          <p className="mt-2 text-xs text-muted">
+            Crea y vincula un número al instante, sin salir de este panel. VAPI solo asigna números de EE.UU. — requiere una
+            tarjeta cargada en tu cuenta de VAPI (Settings → Billing).
+          </p>
+        </form>
+      ) : (
+        <div>
+          <a
+            href="https://console.twilio.com/us1/develop/phone-numbers/manage/search"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setShowTwilio(true)}
+            className="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Quiero otro número (comprar en Twilio)
+          </a>
+          <p className="mt-2 text-xs text-muted">
+            Te abrimos la página de Twilio para que compres el número (podés elegir uno de Argentina). Cuando lo tengas, volvé
+            acá abajo, a &quot;Importar un número propio de Twilio&quot;, y pegalo para vincularlo.
+          </p>
+        </div>
+      )}
 
       <div>
         <button
