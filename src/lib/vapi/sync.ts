@@ -179,6 +179,9 @@ export async function provisionVapiNumber(): Promise<ProvisionedPhoneNumber> {
     provider: "vapi",
     name: clinic.name.slice(0, 40),
     assistantId: config.vapi_assistant_id,
+    // VAPI exige indicar un código de área de EE.UU. para asignar el número
+    // (no vende números por país destino, sino por área dentro de EE.UU.).
+    numberDesiredAreaCode: process.env.VAPI_DEFAULT_AREA_CODE || "305",
   });
 
   const { error: updateError } = await supabase
