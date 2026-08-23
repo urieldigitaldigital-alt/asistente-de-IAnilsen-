@@ -1,4 +1,4 @@
-import { RobotIcon } from "@phosphor-icons/react/dist/ssr";
+import Image from "next/image";
 import Link from "next/link";
 
 export function MarketingNavbar() {
@@ -8,7 +8,7 @@ export function MarketingNavbar() {
     <header className="sticky top-0 z-50 border-b border-border bg-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <RobotIcon size={24} weight="fill" className="text-primary" />
+          <Image src="/logo.png" alt="" width={28} height={28} className="rounded-lg" />
           Asistente Nilsen IA
         </Link>
         <nav className="flex items-center gap-2 sm:gap-3">

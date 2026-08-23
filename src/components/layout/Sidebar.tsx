@@ -5,10 +5,10 @@ import {
   ChatCircleTextIcon,
   GearSixIcon,
   PlugsConnectedIcon,
-  RobotIcon,
   SquaresFourIcon,
   WhatsappLogoIcon,
 } from "@phosphor-icons/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -27,7 +27,7 @@ export function Sidebar({ clinicName }: { clinicName: string }) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <RobotIcon size={24} weight="fill" className="text-primary" />
+        <Image src="/logo.png" alt="" width={32} height={32} className="rounded-lg" />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{clinicName}</p>
           <p className="text-xs text-muted">Asistente Nilsen IA</p>
