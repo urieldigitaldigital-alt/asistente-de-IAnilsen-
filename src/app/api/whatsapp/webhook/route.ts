@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantVapiClient } from "@/lib/vapi/credentials";
 import { getOrCreateWhatsappSession, sendChatMessage } from "@/lib/whatsapp/chat";
 import { getWhatsappCredentialsByNumber } from "@/lib/whatsapp/credentials";
+import { logWhatsappMessage } from "@/lib/whatsapp/messages";
 import { sendWhatsAppMessage, verifyTwilioSignature } from "@/lib/whatsapp/twilio";
 
 function stripWhatsappPrefix(address: string): string {
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
   try {
     const vapi = await getTenantVapiClient(credentials.clinicId, admin);
 
-    const sessionId = await getOrCreateWhatsappSession({
+    const conversation = await getOrCreateWhatsappSession({
       clinicId: credentials.clinicId,
       customerPhone,
       assistantId: config.vapi_assistant_id,
@@ -82,14 +83,34 @@ export async function POST(request: NextRequest) {
       admin,
     });
 
-    const reply = await sendChatMessage({ vapi, assistantId: config.vapi_assistant_id, sessionId, input: body });
+    await logWhatsappMessage(admin, {
+      clinicId: credentials.clinicId,
+      sessionId: conversation.id,
+      role: "customer",
+      body,
+    });
+
+    const reply = await sendChatMessage({
+      vapi,
+      assistantId: config.vapi_assistant_id,
+      sessionId: conversation.vapiSessionId,
+      input: body,
+    });
+    const replyText = reply ?? "Gracias por tu mensaje. En breve te contestamos.";
+
+    await logWhatsappMessage(admin, {
+      clinicId: credentials.clinicId,
+      sessionId: conversation.id,
+      role: "assistant",
+      body: replyText,
+    });
 
     await sendWhatsAppMessage({
       accountSid: credentials.twilioAccountSid,
       authToken: credentials.twilioAuthToken,
       from: whatsappNumber,
       to: customerPhone,
-      body: reply ?? "Gracias por tu mensaje. En breve te contestamos.",
+      body: replyText,
     });
   } catch (err) {
     console.error("Error procesando mensaje de WhatsApp:", err);

@@ -1,6 +1,8 @@
 export type AppointmentStatus = "scheduled" | "cancelled" | "completed";
 export type ProfileRole = "owner" | "staff";
 export type TranscriptRole = "assistant" | "user";
+export type WhatsappConversationStatus = "active" | "needs_follow_up" | "resolved";
+export type WhatsappMessageRole = "customer" | "assistant";
 
 export interface DayHours {
   start: string; // "09:00"
@@ -153,7 +155,10 @@ export interface Database {
           id: string;
           clinic_id: string;
           customer_phone: string;
+          customer_name: string | null;
           vapi_session_id: string;
+          status: WhatsappConversationStatus;
+          last_message_at: string;
           updated_at: string;
           created_at: string;
         };
@@ -163,6 +168,24 @@ export interface Database {
           vapi_session_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_sessions"]["Row"]>;
+        Relationships: [];
+      };
+      whatsapp_messages: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          session_id: string;
+          role: WhatsappMessageRole;
+          body: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Row"]> & {
+          clinic_id: string;
+          session_id: string;
+          role: WhatsappMessageRole;
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Row"]>;
         Relationships: [];
       };
       calls: {
@@ -251,6 +274,7 @@ export type GoogleCredentials = Database["public"]["Tables"]["google_credentials
 export type VapiCredentials = Database["public"]["Tables"]["vapi_credentials"]["Row"];
 export type WhatsappCredentials = Database["public"]["Tables"]["whatsapp_credentials"]["Row"];
 export type WhatsappSession = Database["public"]["Tables"]["whatsapp_sessions"]["Row"];
+export type WhatsappMessage = Database["public"]["Tables"]["whatsapp_messages"]["Row"];
 export type Call = Database["public"]["Tables"]["calls"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];

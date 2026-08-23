@@ -7,6 +7,7 @@ import {
   PlugsConnectedIcon,
   RobotIcon,
   SquaresFourIcon,
+  WhatsappLogoIcon,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +15,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: SquaresFourIcon },
   { href: "/calendario", label: "Calendario", icon: CalendarBlankIcon },
+  { href: "/whatsapp", label: "WhatsApp", icon: WhatsappLogoIcon },
   { href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon },
   { href: "/personalizacion", label: "Personalización", icon: GearSixIcon },
   { href: "/integraciones", label: "Integraciones", icon: PlugsConnectedIcon },

@@ -2,8 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { createClient } from "@/lib/supabase/server";
+import type { WhatsappConversationStatus } from "@/types/database";
 import { friendlyVapiError } from "@/lib/vapi/friendlyError";
 import { saveWhatsappCredentials } from "@/lib/whatsapp/credentials";
+import { updateConversationStatus } from "@/lib/whatsapp/messages";
 import { whatsappCredentialsFormSchema } from "@/lib/validation";
 
 export interface WhatsappActionState {
@@ -32,4 +35,10 @@ export async function saveWhatsappCredentialsAction(
     console.error("Error guardando las credenciales de WhatsApp.");
     return { error: friendlyVapiError(err, "No se pudo conectar WhatsApp."), success: null };
   }
+}
+
+export async function updateWhatsappStatusAction(sessionId: string, status: WhatsappConversationStatus): Promise<void> {
+  const supabase = await createClient();
+  await updateConversationStatus(supabase, sessionId, status);
+  revalidatePath("/whatsapp");
 }

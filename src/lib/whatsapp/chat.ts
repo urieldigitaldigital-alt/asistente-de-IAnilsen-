@@ -3,6 +3,13 @@ import type { Vapi, VapiClient } from "@vapi-ai/server-sdk";
 
 import type { Database } from "@/types/database";
 
+export interface WhatsappConversation {
+  /** id de la fila en whatsapp_sessions (nuestra conversación) — usado para loguear mensajes. */
+  id: string;
+  /** id de la sesión en VAPI — usado para llamar a la Chat API. */
+  vapiSessionId: string;
+}
+
 /**
  * Busca (o crea) la sesión de la Chat API de VAPI para esta conversación de
  * WhatsApp (negocio + número del cliente), para que el asistente recuerde el
@@ -14,30 +21,33 @@ export async function getOrCreateWhatsappSession(params: {
   assistantId: string;
   vapi: VapiClient;
   admin: SupabaseClient<Database>;
-}): Promise<string> {
+}): Promise<WhatsappConversation> {
   const { clinicId, customerPhone, assistantId, vapi, admin } = params;
 
   const { data: existing } = await admin
     .from("whatsapp_sessions")
-    .select("vapi_session_id")
+    .select("id, vapi_session_id")
     .eq("clinic_id", clinicId)
     .eq("customer_phone", customerPhone)
     .maybeSingle();
-  if (existing) return existing.vapi_session_id;
+  if (existing) return { id: existing.id, vapiSessionId: existing.vapi_session_id };
 
   const session = await vapi.sessions.create({
     assistantId,
     name: `whatsapp-${customerPhone}`.slice(0, 40),
   });
 
-  await admin
+  const { data: created, error } = await admin
     .from("whatsapp_sessions")
     .upsert(
       { clinic_id: clinicId, customer_phone: customerPhone, vapi_session_id: session.id },
       { onConflict: "clinic_id,customer_phone" }
-    );
+    )
+    .select("id")
+    .single();
+  if (error || !created) throw error ?? new Error("No se pudo crear la conversación de WhatsApp.");
 
-  return session.id;
+  return { id: created.id, vapiSessionId: session.id };
 }
 
 /** Extrae el último mensaje de texto del asistente de la respuesta de la Chat API. */
