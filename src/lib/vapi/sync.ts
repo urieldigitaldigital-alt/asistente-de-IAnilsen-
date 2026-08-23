@@ -38,6 +38,16 @@ function buildVoice(voice: { provider: string; voiceId: string; speed?: number; 
   return { provider: "vapi", voiceId: voiceId as Vapi.VapiVoiceVoiceId };
 }
 
+/** Si el dueño eligió provider "11labs", adjunta la clave propia de ElevenLabs
+ *  (guardada solo en el servidor) como credencial del assistant — evita que
+ *  el dueño tenga que configurarla manualmente en el dashboard de VAPI. */
+function buildCredentials(voiceProvider: string): Vapi.CreateAssistantDtoCredentialsItem[] | undefined {
+  if (voiceProvider !== "11labs") return undefined;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return undefined;
+  return [{ provider: "11labs", apiKey }];
+}
+
 function buildTranscriber(language: string): Vapi.CreateAssistantDtoTranscriber {
   const deepgramLanguage = (process.env.VAPI_DEFAULT_TRANSCRIBER_LANGUAGE || language || "es") as Vapi.DeepgramTranscriberLanguage;
   return {
@@ -98,6 +108,7 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
     model: buildModel(config.model, tools, systemPrompt),
     voice: buildVoice(config.voice),
     transcriber: buildTranscriber(config.language),
+    credentials: buildCredentials(config.voice.provider),
     server: {
       url: `${getAppUrl()}/api/vapi/webhook`,
       headers: { "x-webhook-secret": secret },
