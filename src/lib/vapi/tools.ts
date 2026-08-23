@@ -16,7 +16,7 @@ interface BuildToolsParams {
 
 /**
  * Tools que resuelven contra el webhook del asistente (`model.tools`), más
- * las tools nativas endCall (siempre) y transferCall (solo si la clínica
+ * las tools nativas endCall (siempre) y transferCall (solo si el negocio
  * configuró un teléfono de recepción). Ninguna define `server` propio: todas
  * heredan `assistant.server.url` (ver lib/vapi/sync.ts), que es el siguiente
  * nivel de prioridad cuando una tool no trae su propio server.
@@ -32,15 +32,15 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
       function: {
         name: TOOL_NAMES.checkAvailability,
         description:
-          "Consulta si hay disponibilidad para un tratamiento en una fecha/hora, respetando el horario de atención de la clínica. Si el horario pedido no está libre, devuelve hasta 3 alternativas.",
+          "Consulta si hay disponibilidad para un servicio en una fecha/hora, respetando el horario de atención del negocio. Si el horario pedido no está libre, devuelve hasta 3 alternativas.",
         parameters: {
           type: "object",
           properties: {
-            treatment: { type: "string", description: "Tratamiento solicitado (p. ej. limpieza, revisión, urgencia, ortodoncia)." },
+            treatment: { type: "string", description: "Servicio solicitado (según los servicios configurados por el negocio)." },
             datetime: {
               type: "string",
               description:
-                "Fecha y hora solicitadas, en hora local de la clínica (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto de la clínica, nunca un año anterior.",
+                "Fecha y hora solicitadas, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
             },
             durationMinutes: { type: "number", description: "Duración estimada de la cita en minutos." },
             daysAhead: { type: "number", description: "Días hacia adelante a considerar si no se pide una fecha exacta (1-30)." },
@@ -59,14 +59,14 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
             datetime: {
               type: "string",
               description:
-                "Fecha y hora de la cita, en hora local de la clínica (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto de la clínica, nunca un año anterior.",
+                "Fecha y hora de la cita, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
             },
             durationMinutes: { type: "number", description: "Duración de la cita en minutos." },
-            patientName: { type: "string", description: "Nombre completo del paciente." },
-            patientPhone: { type: "string", description: "Teléfono del paciente." },
-            patientEmail: { type: "string", description: "Correo del paciente (opcional)." },
-            treatment: { type: "string", description: "Tratamiento a realizar." },
-            isNewPatient: { type: "boolean", description: "Si es la primera vez del paciente en la clínica." },
+            patientName: { type: "string", description: "Nombre completo del cliente." },
+            patientPhone: { type: "string", description: "Teléfono del cliente." },
+            patientEmail: { type: "string", description: "Correo del cliente (opcional)." },
+            treatment: { type: "string", description: "Servicio a realizar." },
+            isNewPatient: { type: "boolean", description: "Si es la primera vez del cliente en el negocio." },
             notes: { type: "string", description: "Notas adicionales (opcional)." },
           },
           required: ["datetime", "durationMinutes", "patientName", "patientPhone", "treatment", "isNewPatient"],
@@ -77,17 +77,17 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
       type: "function",
       function: {
         name: TOOL_NAMES.cancelAppointment,
-        description: "Cancela una cita existente, identificada por el paciente y la fecha.",
+        description: "Cancela una cita existente, identificada por el cliente y la fecha.",
         parameters: {
           type: "object",
           properties: {
             eventId: { type: "string", description: "ID del evento de Google Calendar, si se conoce." },
-            patientName: { type: "string", description: "Nombre del paciente." },
-            patientPhone: { type: "string", description: "Teléfono del paciente." },
+            patientName: { type: "string", description: "Nombre del cliente." },
+            patientPhone: { type: "string", description: "Teléfono del cliente." },
             datetime: {
               type: "string",
               description:
-                "Fecha y hora aproximadas de la cita a cancelar, en hora local de la clínica, formato AAAA-MM-DDTHH:MM:SS.",
+                "Fecha y hora aproximadas de la cita a cancelar, en hora local del negocio, formato AAAA-MM-DDTHH:MM:SS.",
             },
           },
         },
@@ -97,7 +97,7 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
       type: "function",
       function: {
         name: TOOL_NAMES.getClinicInfo,
-        description: "Devuelve información de la clínica (dirección, horarios, formas de pago, políticas) para responder preguntas frecuentes.",
+        description: "Devuelve información del negocio (dirección, horarios, formas de pago, políticas) para responder preguntas frecuentes.",
         parameters: { type: "object", properties: {} },
       },
     },
@@ -128,7 +128,7 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
           type: "number",
           number: receptionPhoneNumber,
           message: "Le comunico con recepción, un momento por favor.",
-          description: "Transferir a recepción cuando el paciente lo pida explícitamente o haya una urgencia que el asistente no pueda resolver.",
+          description: "Transferir a recepción cuando el cliente lo pida explícitamente o haya una urgencia que el asistente no pueda resolver.",
         },
       ],
     });

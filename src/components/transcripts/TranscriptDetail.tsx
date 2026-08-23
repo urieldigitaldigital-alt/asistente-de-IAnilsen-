@@ -80,7 +80,7 @@ export function TranscriptDetail({ detail }: { detail: CallDetail }) {
                   }`}
                 >
                   <p className="mb-0.5 text-[11px] font-medium text-muted">
-                    {turn.role === "assistant" ? "Asistente" : "Paciente"}
+                    {turn.role === "assistant" ? "Asistente" : "Cliente"}
                   </p>
                   {turn.text}
                 </div>

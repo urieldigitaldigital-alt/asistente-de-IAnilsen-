@@ -20,7 +20,7 @@ export function SignupForm() {
         </p>
       )}
       <div>
-        <Label htmlFor="clinic_name">Nombre de la clínica</Label>
+        <Label htmlFor="clinic_name">Nombre de tu negocio</Label>
         <Input id="clinic_name" name="clinic_name" type="text" required />
       </div>
       <div>
@@ -43,7 +43,7 @@ export function SignupForm() {
         />
       </div>
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Creando cuenta…" : "Crear clínica"}
+        {pending ? "Creando cuenta…" : "Crear cuenta"}
       </Button>
       <p className="text-center text-sm text-muted">
         ¿Ya tienes cuenta?{" "}

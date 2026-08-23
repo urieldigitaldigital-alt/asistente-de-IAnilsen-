@@ -4,7 +4,7 @@ import { GoogleCalendarCard } from "@/components/integrations/GoogleCalendarCard
 import { VapiNumberCard } from "@/components/integrations/VapiNumberCard";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Integraciones — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Integraciones — Asistente Nilsen IA" };
 
 export default async function IntegrationsPage({
   searchParams,

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { AgentConfigForm } from "@/components/customize/AgentConfigForm";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Personalización — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Personalización — Asistente Nilsen IA" };
 
 export default async function CustomizePage() {
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export default async function CustomizePage() {
       <div>
         <h1 className="text-xl font-semibold">Personalización</h1>
         <p className="text-sm text-muted">
-          Edita el prompt, la información de la clínica y la configuración del agente de voz.
+          Edita el prompt, la información del negocio y la configuración del agente de voz.
         </p>
       </div>
       <AgentConfigForm clinic={clinic} config={config} />

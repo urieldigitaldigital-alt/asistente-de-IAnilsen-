@@ -5,8 +5,8 @@ import {
   ChatCircleTextIcon,
   GearSixIcon,
   PlugsConnectedIcon,
+  RobotIcon,
   SquaresFourIcon,
-  ToothIcon,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,10 +25,10 @@ export function Sidebar({ clinicName }: { clinicName: string }) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <ToothIcon size={24} weight="fill" className="text-primary" />
+        <RobotIcon size={24} weight="fill" className="text-primary" />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{clinicName}</p>
-          <p className="text-xs text-muted">Asistente Dental IA</p>
+          <p className="text-xs text-muted">Asistente Nilsen IA</p>
         </div>
       </div>
       <nav className="flex-1 space-y-1 p-3">

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Asistente Dental IA",
-  description: "Panel de gestión del agente de voz IA para clínicas dentales",
+  title: "Asistente Nilsen IA",
+  description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

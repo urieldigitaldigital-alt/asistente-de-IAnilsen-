@@ -24,8 +24,8 @@ export function ServicesEditor({
     <Card className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold">Tratamientos / servicios</h2>
-          <p className="text-xs text-muted">Nombre, duración y descripción de cada tratamiento que ofrece la clínica.</p>
+          <h2 className="text-sm font-semibold">Servicios</h2>
+          <p className="text-xs text-muted">Nombre, duración y descripción de cada servicio que ofrece tu negocio.</p>
         </div>
         <Button
           type="button"
@@ -70,13 +70,13 @@ export function ServicesEditor({
               type="button"
               onClick={() => onChange(services.filter((_, i) => i !== index))}
               className="rounded-lg p-2 text-danger hover:bg-danger/10"
-              aria-label="Eliminar tratamiento"
+              aria-label="Eliminar servicio"
             >
               <TrashIcon size={16} />
             </button>
           </div>
         ))}
-        {services.length === 0 && <p className="text-sm text-muted">Sin tratamientos configurados.</p>}
+        {services.length === 0 && <p className="text-sm text-muted">Sin servicios configurados.</p>}
       </div>
     </Card>
   );

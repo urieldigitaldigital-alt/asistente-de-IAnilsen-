@@ -38,7 +38,7 @@ export function LoginForm({ confirmEmail }: { confirmEmail: boolean }) {
       <p className="text-center text-sm text-muted">
         ¿No tienes cuenta?{" "}
         <Link href="/signup" className="font-medium text-primary hover:underline">
-          Crea tu clínica
+          Crea tu cuenta
         </Link>
       </p>
     </form>

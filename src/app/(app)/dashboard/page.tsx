@@ -9,7 +9,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { getDashboardData } from "@/lib/dashboardData";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Dashboard — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Dashboard — Asistente Nilsen IA" };
 
 export default async function DashboardPage() {
   const supabase = await createClient();

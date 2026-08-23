@@ -6,7 +6,7 @@ import { CalendarView } from "@/components/calendar/CalendarView";
 import { getCalendarMonthData, parseMonthParam, shiftMonthParam } from "@/lib/calendarData";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Calendario — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Calendario — Asistente Nilsen IA" };
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { month } = await searchParams;

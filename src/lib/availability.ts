@@ -64,7 +64,7 @@ const NAIVE_DATETIME_REGEX = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d
  * Parsea una fecha/hora recibida de una tool de VAPI (el modelo casi nunca
  * incluye offset/"Z", aunque el prompt se lo pida). Si trae offset, se
  * interpreta tal cual; si no, se interpreta como hora de pared en la
- * timezone de la clínica (que es lo que un paciente/agente quieren decir al
+ * timezone del negocio (que es lo que un cliente/agente quieren decir al
  * hablar de "las 3 de la tarde"), evitando el corrimiento de horas que daría
  * un `new Date(...)` ingenuo corriendo en un servidor en UTC.
  */
@@ -79,8 +79,8 @@ export function parseLocalDateTime(input: string, timeZone: string): Date {
 }
 
 /**
- * Formatea un instante en la timezone de la clínica para hablar/mostrar al
- * paciente, en español natural ("a las 3 de la tarde") en vez de notación
+ * Formatea un instante en la timezone del negocio para hablar/mostrar al
+ * cliente, en español natural ("a las 3 de la tarde") en vez de notación
  * a.m./p.m. — el modelo tiende a repetir el string tal cual, y "p.m." se
  * lee mal o en inglés en la síntesis de voz.
  */

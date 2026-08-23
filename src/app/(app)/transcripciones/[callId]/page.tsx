@@ -6,7 +6,7 @@ import { TranscriptDetail } from "@/components/transcripts/TranscriptDetail";
 import { getCallDetail } from "@/lib/transcriptsData";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Transcripción — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Transcripción — Asistente Nilsen IA" };
 
 export default async function TranscriptDetailPage({
   params,

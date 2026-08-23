@@ -46,10 +46,10 @@ export function ClinicInfoForm({
 }: ClinicInfoFormProps) {
   return (
     <Card className="space-y-4">
-      <h2 className="text-sm font-semibold">Información de la clínica</h2>
+      <h2 className="text-sm font-semibold">Información del negocio</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="clinic_name">Nombre de la clínica</Label>
+          <Label htmlFor="clinic_name">Nombre del negocio</Label>
           <Input id="clinic_name" value={clinicName} onChange={(e) => onClinicNameChange(e.target.value)} />
         </div>
         <div>

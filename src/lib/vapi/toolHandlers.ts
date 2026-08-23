@@ -25,7 +25,7 @@ export interface ToolHandlerContext {
  * El modelo a veces "recuerda" un año de su corpus de entrenamiento en vez
  * del año real (p. ej. pide "2024-08-24" cuando hoy es 2026). Si la fecha
  * pedida cae en el pasado, la adelantamos año a año hasta la próxima
- * ocurrencia futura de ese mismo mes/día/hora — asume que un paciente que
+ * ocurrencia futura de ese mismo mes/día/hora — asume que un cliente que
  * llama nunca quiere agendar algo que ya pasó.
  */
 function assumeFutureIntent(date: Date, now: Date): Date {

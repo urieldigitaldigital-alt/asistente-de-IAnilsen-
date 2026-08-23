@@ -119,7 +119,7 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
     ],
     // Por defecto VAPI corta al asistente con solo 0.2s de cualquier sonido
     // de voz (ni una palabra completa) — eso lo interrumpía con ruido de
-    // fondo o pausas del paciente. Exigimos al menos 2 palabras reales antes
+    // fondo o pausas del cliente. Exigimos al menos 2 palabras reales antes
     // de considerarlo una interrupción genuina.
     stopSpeakingPlan: {
       numWords: 2,

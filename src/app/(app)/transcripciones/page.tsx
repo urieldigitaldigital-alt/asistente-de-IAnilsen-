@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { listCalls } from "@/lib/transcriptsData";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Transcripciones — Asistente Dental IA" };
+export const metadata: Metadata = { title: "Transcripciones — Asistente Nilsen IA" };
 
 interface SearchParams {
   q?: string;
