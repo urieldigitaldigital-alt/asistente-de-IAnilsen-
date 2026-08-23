@@ -87,6 +87,16 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
       headers: { "x-webhook-secret": secret },
     },
     serverMessages: ["tool-calls", "end-of-call-report", "status-update", "transcript"] as Vapi.CreateAssistantDtoServerMessagesItem[],
+    // Red de seguridad además de la tool endCall: si el asistente dice
+    // cualquiera de estas frases de despedida, VAPI cuelga automáticamente
+    // aunque el modelo no llegue a invocar la tool.
+    endCallPhrases: [
+      "que tengas un excelente día",
+      "que tengas un gran día",
+      "hasta luego",
+      "hasta pronto",
+      "que tengas buen día",
+    ],
   };
 
   let assistantId = config.vapi_assistant_id;

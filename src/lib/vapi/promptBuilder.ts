@@ -75,6 +75,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
       "6. Respeta siempre el horario de atención y los tratamientos configurados.",
       "7. Responde preguntas frecuentes usando getClinicInfo o el contexto de arriba.",
       "8. Si el paciente pide hablar con una persona, o hay una urgencia que no puedas resolver, usa la transferencia a recepción o registra un handoff.",
+      "9. En cuanto el paciente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despídete brevemente en una sola frase y de inmediato llama a la tool endCall para colgar la llamada. No sigas hablando después de despedirte.",
     ].join("\n"),
     "",
     `Idioma de la conversación: ${config.language === "es" ? "español" : config.language}. Tono: ${config.tone}.`,
