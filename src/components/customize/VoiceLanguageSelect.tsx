@@ -17,9 +17,19 @@ const LANGUAGES = [
   { code: "en", label: "Inglés" },
 ];
 
+const SPEED_OPTIONS = [
+  { value: 0.9, label: "Más lento (0.9x)" },
+  { value: 1, label: "Normal (1x)" },
+  { value: 1.15, label: "Un poco más rápido (1.15x)" },
+  { value: 1.3, label: "Rápido (1.3x)" },
+  { value: 1.5, label: "Muy rápido (1.5x)" },
+];
+
 interface VoiceLanguageSelectProps {
   voiceId: string;
   onVoiceIdChange: (value: string) => void;
+  speed: number;
+  onSpeedChange: (value: number) => void;
   language: string;
   onLanguageChange: (value: string) => void;
   modelName: string;
@@ -29,6 +39,8 @@ interface VoiceLanguageSelectProps {
 export function VoiceLanguageSelect({
   voiceId,
   onVoiceIdChange,
+  speed,
+  onSpeedChange,
   language,
   onLanguageChange,
   modelName,
@@ -37,7 +49,7 @@ export function VoiceLanguageSelect({
   return (
     <Card className="space-y-4">
       <h2 className="text-sm font-semibold">Voz, idioma y modelo</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label htmlFor="voice_id">Voz (Azure)</Label>
           <select
@@ -49,6 +61,21 @@ export function VoiceLanguageSelect({
             {AZURE_SPANISH_VOICES.map((voice) => (
               <option key={voice.id} value={voice.id}>
                 {voice.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="voice_speed">Velocidad de habla</Label>
+          <select
+            id="voice_speed"
+            value={speed}
+            onChange={(e) => onSpeedChange(Number(e.target.value))}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            {SPEED_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>

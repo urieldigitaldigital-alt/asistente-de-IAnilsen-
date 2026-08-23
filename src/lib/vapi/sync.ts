@@ -11,12 +11,15 @@ function getAppUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-function buildVoice(voice: { provider: string; voiceId: string }): Vapi.CreateAssistantDtoVoice {
+function buildVoice(voice: { provider: string; voiceId: string; speed?: number }): Vapi.CreateAssistantDtoVoice {
   const provider = voice.provider || process.env.VAPI_DEFAULT_VOICE_PROVIDER || "azure";
   const voiceId = voice.voiceId || process.env.VAPI_DEFAULT_VOICE_ID || "es-MX-DaliaNeural";
+  // Un poco más rápido que el 1.0 nativo de Azure por defecto: se siente más
+  // natural para una llamada telefónica que el ritmo "de lectura" estándar.
+  const speed = voice.speed ?? 1.15;
 
   if (provider === "azure") {
-    return { provider: "azure", voiceId: voiceId as Vapi.AzureVoiceId };
+    return { provider: "azure", voiceId: voiceId as Vapi.AzureVoiceId, speed };
   }
   // Fallback razonable: voz propia de Vapi si se configuró un provider no soportado aún.
   return { provider: "vapi", voiceId: voiceId as Vapi.VapiVoiceVoiceId };

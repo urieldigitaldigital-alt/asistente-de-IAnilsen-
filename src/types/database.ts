@@ -29,6 +29,8 @@ export interface ClinicInfo {
 export interface AgentVoiceConfig {
   provider: string;
   voiceId: string;
+  /** Multiplicador de velocidad de habla (1 = normal). Solo aplica al provider azure. */
+  speed?: number;
 }
 
 export interface AgentModelConfig {

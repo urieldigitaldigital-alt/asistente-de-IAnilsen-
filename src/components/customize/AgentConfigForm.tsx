@@ -46,6 +46,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [businessHours, setBusinessHours] = useState<BusinessHours>(config.business_hours);
 
   const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
+  const [speed, setSpeed] = useState(config.voice.speed ?? 1.15);
   const [language, setLanguage] = useState(config.language);
   const [modelName, setModelName] = useState(config.model.model || "gpt-4.1");
 
@@ -60,13 +61,27 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         clinic_info: { policies, paymentMethods, faq },
         services,
         business_hours: businessHours,
-        voice: { provider: "azure", voiceId },
+        voice: { provider: "azure", voiceId, speed },
         language,
         model: { provider: "openai", model: modelName },
         first_message: firstMessage,
         handoff_message: handoffMessage,
       }),
-    [systemPrompt, tone, policies, paymentMethods, faq, services, businessHours, voiceId, language, modelName, firstMessage, handoffMessage]
+    [
+      systemPrompt,
+      tone,
+      policies,
+      paymentMethods,
+      faq,
+      services,
+      businessHours,
+      voiceId,
+      speed,
+      language,
+      modelName,
+      firstMessage,
+      handoffMessage,
+    ]
   );
 
   const clinicJson = useMemo(
@@ -109,6 +124,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       <VoiceLanguageSelect
         voiceId={voiceId}
         onVoiceIdChange={setVoiceId}
+        speed={speed}
+        onSpeedChange={setSpeed}
         language={language}
         onLanguageChange={setLanguage}
         modelName={modelName}
