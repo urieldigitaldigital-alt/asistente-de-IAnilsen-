@@ -1,13 +1,15 @@
 "use client";
 
-import { CurrencyDollarIcon, ForkKnifeIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { CurrencyDollarIcon, ForkKnifeIcon, PrinterIcon } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { updateOrderStatusAction } from "@/actions/orders";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderStatus } from "@/types/database";
+
+const AUTO_PRINT_STORAGE_KEY = "pedidos_auto_print";
 
 // Solo los estados "activos" tienen columna propia en el tablero — una vez
 // entregado o cancelado, el pedido ya no requiere acción y estorba en la
@@ -39,7 +41,63 @@ function sortByArrival(orders: Order[], status: OrderStatus): Order[] {
   return [...orders].sort((a, b) => new Date(a[field] as string).getTime() - new Date(b[field] as string).getTime());
 }
 
-function OrderCard({ order, timeZone, disabled }: { order: Order; timeZone: string; disabled: boolean }) {
+function formatTicketDateTime(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone,
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+/**
+ * Ticket de cocina: solo esto se ve al imprimir (ver print:hidden en el
+ * resto del tablero) — ancho fijo pensado para impresora térmica de 80mm.
+ */
+function PrintTicket({ order, clinicName, timeZone }: { order: Order | null; clinicName: string; timeZone: string }) {
+  if (!order) return null;
+  return (
+    <div className="hidden print:block print:w-full print:font-mono print:text-black">
+      <p className="text-center text-base font-bold">{clinicName}</p>
+      <p className="text-center text-xs">{formatTicketDateTime(order.created_at, timeZone)}</p>
+      <p className="my-1 border-t border-dashed border-black" />
+      <p className="text-sm font-bold">{order.order_type === "delivery" ? "ENVÍO A DOMICILIO" : "RETIRA EN EL LOCAL"}</p>
+      {order.order_type === "delivery" && order.delivery_address && <p className="text-sm">{order.delivery_address}</p>}
+      <p className="text-sm">{order.customer_name}</p>
+      <p className="text-sm">{order.customer_phone}</p>
+      <p className="my-1 border-t border-dashed border-black" />
+      <ul className="space-y-1 text-sm">
+        {order.items.map((item, i) => (
+          <li key={i}>
+            <span className="font-bold">{item.quantity}×</span> {item.name}
+            {item.notes ? <span className="block pl-4 text-xs italic">— {item.notes}</span> : null}
+          </li>
+        ))}
+      </ul>
+      <p className="my-1 border-t border-dashed border-black" />
+      {order.notes && (
+        <>
+          <p className="text-sm italic">Nota: {order.notes}</p>
+          <p className="my-1 border-t border-dashed border-black" />
+        </>
+      )}
+      <p className="text-right text-base font-bold">Total: ${order.total.toFixed(2)}</p>
+    </div>
+  );
+}
+
+function OrderCard({
+  order,
+  timeZone,
+  disabled,
+  onPrint,
+}: {
+  order: Order;
+  timeZone: string;
+  disabled: boolean;
+  onPrint: (order: Order) => void;
+}) {
   const [, startTransition] = useTransition();
 
   return (
@@ -49,7 +107,18 @@ function OrderCard({ order, timeZone, disabled }: { order: Order; timeZone: stri
           <p className="font-medium">{order.customer_name}</p>
           <p className="text-xs text-muted">{order.customer_phone}</p>
         </div>
-        <span className="shrink-0 text-xs text-muted">{formatTime(order.created_at, timeZone)}</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs text-muted">{formatTime(order.created_at, timeZone)}</span>
+          <button
+            type="button"
+            onClick={() => onPrint(order)}
+            className="rounded p-1 text-muted hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            aria-label="Imprimir ticket"
+            title="Imprimir ticket"
+          >
+            <PrinterIcon size={14} />
+          </button>
+        </div>
       </div>
 
       <ul className="space-y-0.5 text-xs">
@@ -94,17 +163,41 @@ function OrderCard({ order, timeZone, disabled }: { order: Order; timeZone: stri
 
 export function OrdersBoard({
   clinicId,
+  clinicName,
   timeZone,
   initialOrders,
 }: {
   clinicId: string;
+  clinicName: string;
   timeZone: string;
   initialOrders: Order[];
 }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [isPending] = useTransition();
 
+  // Impresión automática del ticket: cada negocio (y cada dispositivo, ej.
+  // la tablet de la cocina) la prende o apaga según si tiene una impresora
+  // conectada — se guarda por dispositivo, no es un dato del negocio.
+  const [autoPrint, setAutoPrint] = useState(false);
+  const [printQueue, setPrintQueue] = useState<Order[]>([]);
+  const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+  const autoPrintRef = useRef(autoPrint);
+  autoPrintRef.current = autoPrint;
+
   const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(AUTO_PRINT_STORAGE_KEY);
+    if (stored !== null) setAutoPrint(stored === "true");
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(AUTO_PRINT_STORAGE_KEY, String(autoPrint));
+  }, [autoPrint]);
+
+  const handlePrint = useCallback((order: Order) => {
+    setPrintQueue((q) => [...q, order]);
+  }, []);
 
   useEffect(() => {
     const channel = supabase
@@ -119,6 +212,11 @@ export function OrdersBoard({
             const withoutRow = prev.filter((o) => o.id !== row.id);
             return [row, ...withoutRow].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           });
+          // Solo los pedidos nuevos (no cambios de estado) disparan la
+          // impresión automática, y solo si este dispositivo la tiene prendida.
+          if (payload.eventType === "INSERT" && autoPrintRef.current) {
+            handlePrint(row);
+          }
         }
       )
       .subscribe();
@@ -126,7 +224,28 @@ export function OrdersBoard({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, clinicId]);
+  }, [supabase, clinicId, handlePrint]);
+
+  // Procesa la cola de impresión de a un ticket por vez (el diálogo de
+  // impresión del navegador es bloqueante dentro de la pestaña).
+  useEffect(() => {
+    if (!printingOrder && printQueue.length > 0) {
+      setPrintingOrder(printQueue[0]);
+      setPrintQueue((q) => q.slice(1));
+    }
+  }, [printQueue, printingOrder]);
+
+  useEffect(() => {
+    if (!printingOrder) return;
+    const id = setTimeout(() => window.print(), 150);
+    return () => clearTimeout(id);
+  }, [printingOrder]);
+
+  useEffect(() => {
+    const onAfterPrint = () => setPrintingOrder(null);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
 
   if (orders.length === 0) {
     return (
@@ -146,65 +265,78 @@ export function OrdersBoard({
   const cancelled = orders.filter((o) => o.status === "cancelado");
 
   return (
-    <div className="space-y-4">
-      <Card className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 text-primary">
-          <CurrencyDollarIcon size={20} weight="fill" />
-          <h2 className="text-sm font-semibold text-foreground">Facturación de hoy</h2>
-        </div>
-        <p className="text-2xl font-semibold">${revenueToday.toFixed(2)}</p>
-        <p className="text-sm text-muted">
-          {todayOrders.length} {todayOrders.length === 1 ? "pedido" : "pedidos"} hoy
-          {cancelled.filter((o) => isToday(o.created_at, timeZone)).length > 0
-            ? ` (${cancelled.filter((o) => isToday(o.created_at, timeZone)).length} cancelado${cancelled.filter((o) => isToday(o.created_at, timeZone)).length === 1 ? "" : "s"}, no cuenta)`
-            : ""}
-        </p>
-      </Card>
+    <>
+      <div className="space-y-4 print:hidden">
+        <Card className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 text-primary">
+            <CurrencyDollarIcon size={20} weight="fill" />
+            <h2 className="text-sm font-semibold text-foreground">Facturación de hoy</h2>
+          </div>
+          <p className="text-2xl font-semibold">${revenueToday.toFixed(2)}</p>
+          <p className="text-sm text-muted">
+            {todayOrders.length} {todayOrders.length === 1 ? "pedido" : "pedidos"} hoy
+            {cancelled.filter((o) => isToday(o.created_at, timeZone)).length > 0
+              ? ` (${cancelled.filter((o) => isToday(o.created_at, timeZone)).length} cancelado${cancelled.filter((o) => isToday(o.created_at, timeZone)).length === 1 ? "" : "s"}, no cuenta)`
+              : ""}
+          </p>
+          <label className="ml-auto flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={autoPrint}
+              onChange={(e) => setAutoPrint(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Imprimir tickets automático (este dispositivo)
+          </label>
+        </Card>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {ACTIVE_STATUS_COLUMNS.map(({ status, label }) => {
-          const columnOrders = sortByArrival(
-            orders.filter((o) => o.status === status),
-            status
-          );
-          return (
-            <div key={status} className="space-y-2 rounded-xl border border-border bg-surface p-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{label}</h3>
-                <span className="text-xs text-muted">{columnOrders.length}</span>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {ACTIVE_STATUS_COLUMNS.map(({ status, label }) => {
+            const columnOrders = sortByArrival(
+              orders.filter((o) => o.status === status),
+              status
+            );
+            return (
+              <div key={status} className="space-y-2 rounded-xl border border-border bg-surface p-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{label}</h3>
+                  <span className="text-xs text-muted">{columnOrders.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {columnOrders.map((order) => (
+                    <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} onPrint={handlePrint} />
+                  ))}
+                  {columnOrders.length === 0 && <p className="py-4 text-center text-xs text-muted">Sin pedidos</p>}
+                </div>
               </div>
-              <div className="space-y-2">
-                {columnOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} />
-                ))}
-                {columnOrders.length === 0 && <p className="py-4 text-center text-xs text-muted">Sin pedidos</p>}
-              </div>
+            );
+          })}
+        </div>
+
+        {deliveredToday.length > 0 && (
+          <details className="rounded-xl border border-border bg-surface p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-muted">Entregados hoy ({deliveredToday.length})</summary>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {deliveredToday.map((order) => (
+                <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} onPrint={handlePrint} />
+              ))}
             </div>
-          );
-        })}
+          </details>
+        )}
+
+        {cancelled.length > 0 && (
+          <details className="rounded-xl border border-border bg-surface p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-muted">Cancelados ({cancelled.length})</summary>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {cancelled.map((order) => (
+                <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} onPrint={handlePrint} />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
-      {deliveredToday.length > 0 && (
-        <details className="rounded-xl border border-border bg-surface p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-muted">Entregados hoy ({deliveredToday.length})</summary>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {deliveredToday.map((order) => (
-              <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} />
-            ))}
-          </div>
-        </details>
-      )}
-
-      {cancelled.length > 0 && (
-        <details className="rounded-xl border border-border bg-surface p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-muted">Cancelados ({cancelled.length})</summary>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {cancelled.map((order) => (
-              <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} />
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
+      <PrintTicket order={printingOrder} clinicName={clinicName} timeZone={timeZone} />
+    </>
   );
 }

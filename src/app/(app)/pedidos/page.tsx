@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Pedidos — Asistente Nilsen IA" };
 
 export default async function PedidosPage() {
   const supabase = await createClient();
-  const { data: clinic } = await supabase.from("clinics").select("id, timezone").single();
+  const { data: clinic } = await supabase.from("clinics").select("id, name, timezone").single();
   if (!clinic) return null;
 
   const { data: orders } = await supabase
@@ -22,7 +22,7 @@ export default async function PedidosPage() {
         <h1 className="text-xl font-semibold">Pedidos</h1>
         <p className="text-sm text-muted">Pedidos tomados por teléfono, en tiempo real.</p>
       </div>
-      <OrdersBoard clinicId={clinic.id} timeZone={clinic.timezone} initialOrders={orders ?? []} />
+      <OrdersBoard clinicId={clinic.id} clinicName={clinic.name} timeZone={clinic.timezone} initialOrders={orders ?? []} />
     </div>
   );
 }
