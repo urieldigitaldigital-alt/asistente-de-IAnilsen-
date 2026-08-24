@@ -71,13 +71,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const phoneNumberId = message.call?.phoneNumberId;
+  // Los números ya no tienen assistantId fijo (ver assistant-request arriba),
+  // así que `call.phoneNumberId` (plano) puede venir vacío en estos eventos;
+  // `call.phoneNumber.id` (anidado) es el que sí viene siempre poblado.
+  const phoneNumberId = message.call?.phoneNumberId ?? message.call?.phoneNumber?.id;
   // Para tool-calls disparados desde WhatsApp (Chat API) no hay `call`, solo `chat`.
   const assistantId = message.call?.assistantId ?? message.chat?.assistantId;
   const vapiCallId = message.call?.id;
   const customerNumber = message.call?.customer?.number ?? null;
 
   if (!phoneNumberId && !assistantId) {
+    console.error("Webhook sin contexto de llamada:", message.type, JSON.stringify(message.call ?? message.chat ?? {}));
     return NextResponse.json({ error: "missing_call_context" }, { status: 400 });
   }
 
