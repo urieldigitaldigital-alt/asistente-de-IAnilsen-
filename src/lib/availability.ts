@@ -1,6 +1,23 @@
 import type { BusinessHours, DayHours } from "@/types/database";
 
 const SLOT_MINUTES = 30;
+const FALLBACK_TIME_ZONE = "America/Mexico_City";
+
+/**
+ * Valida un identificador de timezone antes de pasarlo a Intl.DateTimeFormat
+ * (que tira una excepción síncrona con cualquier valor que no sea un IANA
+ * válido, ej. si alguien guardó "Argentina" en vez de
+ * "America/Argentina/Buenos_Aires") — una llamada de voz no debería cortarse
+ * por un dato de configuración mal cargado.
+ */
+export function resolveTimeZone(timeZone: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return timeZone;
+  } catch {
+    return FALLBACK_TIME_ZONE;
+  }
+}
 
 type WeekdayKey = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
 
@@ -16,7 +33,7 @@ interface ZonedParts {
 
 function getZonedParts(date: Date, timeZone: string): ZonedParts {
   const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: resolveTimeZone(timeZone),
     hour12: false,
     year: "numeric",
     month: "2-digit",
@@ -85,15 +102,16 @@ export function parseLocalDateTime(input: string, timeZone: string): Date {
  * lee mal o en inglés en la síntesis de voz.
  */
 export function formatLocal(date: Date, timeZone: string): string {
+  const safeTimeZone = resolveTimeZone(timeZone);
   const datePart = new Intl.DateTimeFormat("es-MX", {
-    timeZone,
+    timeZone: safeTimeZone,
     weekday: "long",
     day: "numeric",
     month: "long",
   }).format(date);
 
   const timeParts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: safeTimeZone,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

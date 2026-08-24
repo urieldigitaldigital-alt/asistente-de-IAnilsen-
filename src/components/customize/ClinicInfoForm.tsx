@@ -11,6 +11,23 @@ interface FaqItem {
   answer: string;
 }
 
+const TIMEZONE_OPTIONS = [
+  { value: "America/Argentina/Buenos_Aires", label: "Argentina (Buenos Aires)" },
+  { value: "America/Mexico_City", label: "México (Ciudad de México)" },
+  { value: "America/Bogota", label: "Colombia (Bogotá)" },
+  { value: "America/Lima", label: "Perú (Lima)" },
+  { value: "America/Santiago", label: "Chile (Santiago)" },
+  { value: "America/Montevideo", label: "Uruguay (Montevideo)" },
+  { value: "America/Asuncion", label: "Paraguay (Asunción)" },
+  { value: "America/Guayaquil", label: "Ecuador (Guayaquil)" },
+  { value: "America/Caracas", label: "Venezuela (Caracas)" },
+  { value: "America/La_Paz", label: "Bolivia (La Paz)" },
+  { value: "Europe/Madrid", label: "España (Madrid)" },
+  { value: "America/New_York", label: "EE.UU. — Este (Nueva York)" },
+  { value: "America/Los_Angeles", label: "EE.UU. — Oeste (Los Ángeles)" },
+];
+const CUSTOM_TIMEZONE_VALUE = "__custom__";
+
 interface ClinicInfoFormProps {
   clinicName: string;
   onClinicNameChange: (value: string) => void;
@@ -83,8 +100,42 @@ export function ClinicInfoForm({
           <Input id="clinic_address" value={clinicAddress} onChange={(e) => onClinicAddressChange(e.target.value)} />
         </div>
         <div>
-          <Label htmlFor="timezone">Zona horaria (IANA)</Label>
-          <Input id="timezone" value={timezone} onChange={(e) => onTimezoneChange(e.target.value)} placeholder="America/Mexico_City" />
+          <Label htmlFor="timezone">Zona horaria</Label>
+          {(() => {
+            const isKnown = TIMEZONE_OPTIONS.some((tz) => tz.value === timezone);
+            const selectValue = isKnown ? timezone : CUSTOM_TIMEZONE_VALUE;
+            return (
+              <>
+                <select
+                  id="timezone"
+                  value={selectValue}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    onTimezoneChange(next === CUSTOM_TIMEZONE_VALUE ? "" : next);
+                  }}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_TIMEZONE_VALUE}>Otra (escribir manualmente)…</option>
+                </select>
+                {selectValue === CUSTOM_TIMEZONE_VALUE && (
+                  <Input
+                    className="mt-2"
+                    value={timezone}
+                    onChange={(e) => onTimezoneChange(e.target.value)}
+                    placeholder="America/Mexico_City"
+                  />
+                )}
+              </>
+            );
+          })()}
+          <p className="mt-1 text-xs text-muted">
+            Debe ser un identificador IANA válido (ej. America/Argentina/Buenos_Aires) — no alcanza con el nombre del país.
+          </p>
         </div>
         <div>
           <Label htmlFor="payment_methods">Formas de pago (separadas por coma)</Label>
