@@ -1,22 +1,42 @@
 "use client";
 
-import { ForkKnifeIcon } from "@phosphor-icons/react";
+import { CurrencyDollarIcon, ForkKnifeIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { updateOrderStatusAction } from "@/actions/orders";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderStatus } from "@/types/database";
 
-const STATUS_COLUMNS: { status: OrderStatus; label: string }[] = [
+// Solo los estados "activos" tienen columna propia en el tablero — una vez
+// entregado o cancelado, el pedido ya no requiere acción y estorba en la
+// vista de trabajo, así que pasa a las secciones colapsables de abajo.
+const ACTIVE_STATUS_COLUMNS: { status: OrderStatus; label: string }[] = [
   { status: "recibido", label: "Recibido" },
   { status: "en_preparacion", label: "En preparación" },
   { status: "listo", label: "Listo" },
-  { status: "entregado", label: "Entregado" },
 ];
+const ALL_STATUSES: { status: OrderStatus; label: string }[] = [...ACTIVE_STATUS_COLUMNS, { status: "entregado", label: "Entregado" }];
 
 function formatTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("es-MX", { hour: "numeric", minute: "2-digit", timeZone }).format(new Date(iso));
+}
+
+function localDateKey(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+function isToday(iso: string, timeZone: string): boolean {
+  return localDateKey(iso, timeZone) === localDateKey(new Date().toISOString(), timeZone);
+}
+
+// Orden de llegada: el pedido que espera hace más tiempo se procesa primero.
+// Para "Listo" se ordena por cuándo quedó listo (updated_at), no por cuándo
+// se hizo el pedido, para armar el reparto en el orden correcto.
+function sortByArrival(orders: Order[], status: OrderStatus): Order[] {
+  const field: keyof Order = status === "listo" ? "updated_at" : "created_at";
+  return [...orders].sort((a, b) => new Date(a[field] as string).getTime() - new Date(b[field] as string).getTime());
 }
 
 function OrderCard({ order, timeZone, disabled }: { order: Order; timeZone: string; disabled: boolean }) {
@@ -61,7 +81,7 @@ function OrderCard({ order, timeZone, disabled }: { order: Order; timeZone: stri
         }}
         className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
       >
-        {STATUS_COLUMNS.map(({ status, label }) => (
+        {ALL_STATUSES.map(({ status, label }) => (
           <option key={status} value={status}>
             {label}
           </option>
@@ -118,13 +138,35 @@ export function OrdersBoard({
     );
   }
 
+  const todayOrders = orders.filter((o) => isToday(o.created_at, timeZone));
+  const revenueToday = todayOrders.filter((o) => o.status !== "cancelado").reduce((sum, o) => sum + o.total, 0);
+  const deliveredToday = todayOrders.filter((o) => o.status === "entregado").sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
   const cancelled = orders.filter((o) => o.status === "cancelado");
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {STATUS_COLUMNS.map(({ status, label }) => {
-          const columnOrders = orders.filter((o) => o.status === status);
+      <Card className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2 text-primary">
+          <CurrencyDollarIcon size={20} weight="fill" />
+          <h2 className="text-sm font-semibold text-foreground">Facturación de hoy</h2>
+        </div>
+        <p className="text-2xl font-semibold">${revenueToday.toFixed(2)}</p>
+        <p className="text-sm text-muted">
+          {todayOrders.length} {todayOrders.length === 1 ? "pedido" : "pedidos"} hoy
+          {cancelled.filter((o) => isToday(o.created_at, timeZone)).length > 0
+            ? ` (${cancelled.filter((o) => isToday(o.created_at, timeZone)).length} cancelado${cancelled.filter((o) => isToday(o.created_at, timeZone)).length === 1 ? "" : "s"}, no cuenta)`
+            : ""}
+        </p>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {ACTIVE_STATUS_COLUMNS.map(({ status, label }) => {
+          const columnOrders = sortByArrival(
+            orders.filter((o) => o.status === status),
+            status
+          );
           return (
             <div key={status} className="space-y-2 rounded-xl border border-border bg-surface p-3">
               <div className="flex items-center justify-between">
@@ -141,6 +183,17 @@ export function OrdersBoard({
           );
         })}
       </div>
+
+      {deliveredToday.length > 0 && (
+        <details className="rounded-xl border border-border bg-surface p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-muted">Entregados hoy ({deliveredToday.length})</summary>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {deliveredToday.map((order) => (
+              <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} />
+            ))}
+          </div>
+        </details>
+      )}
 
       {cancelled.length > 0 && (
         <details className="rounded-xl border border-border bg-surface p-3">
