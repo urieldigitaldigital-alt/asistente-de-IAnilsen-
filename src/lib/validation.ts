@@ -181,6 +181,8 @@ export const vapiWebhookMessageSchema = z.object({
         phoneNumberId: z.string().optional(),
         assistantId: z.string().optional(),
         customer: z.object({ number: z.string().optional() }).optional(),
+        // Presente en el evento assistant-request (todavía no existe `id`/`phoneNumberId` planos en esa etapa).
+        phoneNumber: z.object({ id: z.string().optional(), number: z.string().optional() }).optional(),
       })
       .optional(),
     // Presente en tool-calls disparados desde la Chat API (ej. WhatsApp) en vez de una llamada.

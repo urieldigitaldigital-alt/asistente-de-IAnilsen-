@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { constantTimeEqual } from "@/lib/crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
+import { buildAssistantPayload } from "@/lib/vapi/sync";
 import { dispatchToolCall } from "@/lib/vapi/toolHandlers";
 import { vapiWebhookMessageSchema } from "@/lib/validation";
 
@@ -30,6 +32,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
   const { message } = parsedBody.data;
+  const admin = createAdminClient();
+
+  // Llega una vez al inicio de cada llamada entrante (el número no tiene un
+  // assistantId fijo, ver lib/vapi/sync.ts): arma el assistant al vuelo con
+  // un saludo personalizado si el número que llama ya pidió/agendó antes.
+  if (message.type === "assistant-request") {
+    const requestPhoneNumberId = message.call?.phoneNumber?.id ?? message.call?.phoneNumberId;
+    if (!requestPhoneNumberId) {
+      return NextResponse.json({ error: "missing_phone_number" }, { status: 400 });
+    }
+
+    const { data: config } = await admin
+      .from("agent_configs")
+      .select("*")
+      .eq("vapi_phone_number_id", requestPhoneNumberId)
+      .maybeSingle();
+    if (!config) {
+      return NextResponse.json({ error: "clinic_not_found" }, { status: 404 });
+    }
+    const { data: clinic } = await admin.from("clinics").select("*").eq("id", config.clinic_id).single();
+    if (!clinic) {
+      return NextResponse.json({ error: "clinic_not_found" }, { status: 404 });
+    }
+
+    try {
+      const firstMessage = await buildPersonalizedFirstMessage(admin, clinic, config, message.call?.customer?.number);
+      const assistant = buildAssistantPayload(clinic, config, firstMessage);
+      return NextResponse.json({ assistant });
+    } catch (err) {
+      console.error("Error armando el assistant dinámico:", err);
+      // Red de seguridad: si algo falla armando el saludo personalizado, la
+      // llamada igual se contesta con el assistant publicado normal.
+      if (config.vapi_assistant_id) {
+        return NextResponse.json({ assistantId: config.vapi_assistant_id });
+      }
+      return NextResponse.json({ error: "assistant_not_ready" }, { status: 500 });
+    }
+  }
 
   const phoneNumberId = message.call?.phoneNumberId;
   // Para tool-calls disparados desde WhatsApp (Chat API) no hay `call`, solo `chat`.
@@ -40,8 +80,6 @@ export async function POST(request: NextRequest) {
   if (!phoneNumberId && !assistantId) {
     return NextResponse.json({ error: "missing_call_context" }, { status: 400 });
   }
-
-  const admin = createAdminClient();
 
   const configQuery = phoneNumberId
     ? admin.from("agent_configs").select("*").eq("vapi_phone_number_id", phoneNumberId)

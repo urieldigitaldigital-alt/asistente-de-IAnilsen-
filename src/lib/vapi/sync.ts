@@ -4,11 +4,23 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenantVapiClient } from "@/lib/vapi/credentials";
 import { buildFirstMessage, buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
+import type { AgentConfig, Clinic } from "@/types/database";
 
 function getAppUrl(): string {
   const url = process.env.APP_URL;
   if (!url) throw new Error("APP_URL no está configurada.");
   return url.replace(/\/$/, "");
+}
+
+/**
+ * Server que recibe el evento `assistant-request` en cada llamada entrante
+ * (en vez de un `assistantId` fijo), para poder devolver un saludo
+ * personalizado por número que llama. Ver /api/vapi/webhook.
+ */
+function buildNumberServer(): Vapi.Server {
+  const secret = process.env.VAPI_WEBHOOK_SECRET;
+  if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
+  return { url: `${getAppUrl()}/api/vapi/webhook`, headers: { "x-webhook-secret": secret } };
 }
 
 function buildVoice(voice: { provider: string; voiceId: string; speed?: number; model?: string }): Vapi.CreateAssistantDtoVoice {
@@ -74,29 +86,20 @@ export interface SyncAssistantResult {
   created: boolean;
 }
 
-/** Compone la configuración completa del asistente a partir de agent_configs y la crea/actualiza en VAPI. */
-export async function syncAssistant(): Promise<SyncAssistantResult> {
-  const supabase = await createClient();
-
-  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("*").single();
-  if (clinicError || !clinic) throw new Error("No se encontró la clínica del usuario.");
-
-  const { data: config, error: configError } = await supabase
-    .from("agent_configs")
-    .select("*")
-    .eq("clinic_id", clinic.id)
-    .single();
-  if (configError || !config) throw new Error("No se encontró la configuración del agente.");
-
+/**
+ * Compone el payload completo de un assistant de VAPI a partir de
+ * clinic/agent_configs. Se usa tanto para publicar el assistant persistido
+ * (botón "Publicar") como, con un firstMessage distinto, en la respuesta al
+ * evento `assistant-request` (saludo personalizado por llamada).
+ */
+export function buildAssistantPayload(clinic: Clinic, config: AgentConfig, firstMessage: string) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
 
   const systemPrompt = buildSystemPrompt(clinic, config);
-  const firstMessage = buildFirstMessage(config, clinic);
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
-  const vapi = await getTenantVapiClient(clinic.id, supabase);
-  const payload = {
+  return {
     name: clinic.name.slice(0, 40),
     firstMessage,
     model: buildModel(config.model, tools, systemPrompt),
@@ -127,6 +130,26 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
       backoffSeconds: 1,
     },
   };
+}
+
+/** Compone la configuración completa del asistente a partir de agent_configs y la crea/actualiza en VAPI. */
+export async function syncAssistant(): Promise<SyncAssistantResult> {
+  const supabase = await createClient();
+
+  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("*").single();
+  if (clinicError || !clinic) throw new Error("No se encontró la clínica del usuario.");
+
+  const { data: config, error: configError } = await supabase
+    .from("agent_configs")
+    .select("*")
+    .eq("clinic_id", clinic.id)
+    .single();
+  if (configError || !config) throw new Error("No se encontró la configuración del agente.");
+
+  const firstMessage = buildFirstMessage(config, clinic);
+  const payload = buildAssistantPayload(clinic, config, firstMessage);
+
+  const vapi = await getTenantVapiClient(clinic.id, supabase);
 
   let assistantId = config.vapi_assistant_id;
   let created = false;
@@ -178,7 +201,9 @@ export async function provisionVapiNumber(): Promise<ProvisionedPhoneNumber> {
   const phoneNumber = await vapi.phoneNumbers.create({
     provider: "vapi",
     name: clinic.name.slice(0, 40),
-    assistantId: config.vapi_assistant_id,
+    // Sin assistantId: dejamos que VAPI nos pida el asistente en cada
+    // llamada (assistant-request) para poder personalizar el saludo.
+    server: buildNumberServer(),
     // VAPI exige indicar un código de área de EE.UU. para asignar el número
     // (no vende números por país destino, sino por área dentro de EE.UU.).
     numberDesiredAreaCode: process.env.VAPI_DEFAULT_AREA_CODE || "305",
@@ -228,7 +253,9 @@ export async function importTwilioNumber(params: TwilioImportParams): Promise<Pr
     twilioAccountSid: params.twilioAccountSid,
     twilioAuthToken: params.twilioAuthToken,
     name: clinic.name.slice(0, 40),
-    assistantId: config.vapi_assistant_id,
+    // Sin assistantId: dejamos que VAPI nos pida el asistente en cada
+    // llamada (assistant-request) para poder personalizar el saludo.
+    server: buildNumberServer(),
   });
 
   const { error: updateError } = await supabase
@@ -258,7 +285,10 @@ export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
 
   await vapi.phoneNumbers.update({
     id: phoneNumberId,
-    body: { provider: phoneNumber.provider, assistantId: config.vapi_assistant_id } as Vapi.UpdatePhoneNumbersRequestBody,
+    // assistantId: null (no solo omitido) para borrar un valor ya fijado —
+    // VAPI trata los campos ausentes en el PATCH como "sin cambios", no como
+    // "vaciar". Sin esto, assistant-request nunca llega a dispararse.
+    body: { provider: phoneNumber.provider, assistantId: null, server: buildNumberServer() } as unknown as Vapi.UpdatePhoneNumbersRequestBody,
   });
 
   const { error: updateError } = await supabase
