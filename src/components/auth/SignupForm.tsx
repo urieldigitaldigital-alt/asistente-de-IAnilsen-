@@ -1,16 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import { signup, type AuthFormState } from "@/actions/auth";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
+import { CUSTOM_TIMEZONE_VALUE, TIMEZONE_OPTIONS } from "@/lib/timezones";
 
 const initialState: AuthFormState = { error: null };
 
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signup, initialState);
+
+  // Default seguro para el render del servidor; en el cliente, apenas monta,
+  // lo reemplazamos por la zona horaria real del navegador de quien se registra.
+  const [timezone, setTimezone] = useState<string>(TIMEZONE_OPTIONS[0].value);
+  const [customTimezone, setCustomTimezone] = useState("");
+
+  useEffect(() => {
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (TIMEZONE_OPTIONS.some((tz) => tz.value === detected)) {
+        setTimezone(detected);
+      } else if (detected) {
+        setCustomTimezone(detected);
+        setTimezone(CUSTOM_TIMEZONE_VALUE);
+      }
+    } catch {
+      // Se queda con el default si el navegador no soporta la detección.
+    }
+  }, []);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -41,6 +61,31 @@ export function SignupForm() {
           minLength={8}
           required
         />
+      </div>
+      <div>
+        <Label htmlFor="timezone">Zona horaria de tu negocio</Label>
+        <select
+          id="timezone"
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          {TIMEZONE_OPTIONS.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
+          <option value={CUSTOM_TIMEZONE_VALUE}>Otra (escribir manualmente)…</option>
+        </select>
+        {timezone === CUSTOM_TIMEZONE_VALUE && (
+          <Input
+            className="mt-2"
+            value={customTimezone}
+            onChange={(e) => setCustomTimezone(e.target.value)}
+            placeholder="America/Mexico_City"
+          />
+        )}
+        <input type="hidden" name="timezone" value={timezone === CUSTOM_TIMEZONE_VALUE ? customTimezone : timezone} />
       </div>
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Creando cuenta…" : "Crear cuenta"}
