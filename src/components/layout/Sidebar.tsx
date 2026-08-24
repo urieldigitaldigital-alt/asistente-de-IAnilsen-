@@ -3,6 +3,7 @@
 import {
   CalendarBlankIcon,
   ChatCircleTextIcon,
+  ForkKnifeIcon,
   GearSixIcon,
   PlugsConnectedIcon,
   SquaresFourIcon,
@@ -12,17 +13,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: SquaresFourIcon },
-  { href: "/calendario", label: "Calendario", icon: CalendarBlankIcon },
-  { href: "/whatsapp", label: "WhatsApp", icon: WhatsappLogoIcon },
-  { href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon },
-  { href: "/personalizacion", label: "Personalización", icon: GearSixIcon },
-  { href: "/integraciones", label: "Integraciones", icon: PlugsConnectedIcon },
-];
+import type { BusinessType } from "@/types/database";
 
-export function Sidebar({ clinicName }: { clinicName: string }) {
+function getNavItems(businessType: BusinessType) {
+  return [
+    { href: "/dashboard", label: "Dashboard", icon: SquaresFourIcon },
+    businessType === "pedidos"
+      ? { href: "/pedidos", label: "Pedidos", icon: ForkKnifeIcon }
+      : { href: "/calendario", label: "Calendario", icon: CalendarBlankIcon },
+    { href: "/whatsapp", label: "WhatsApp", icon: WhatsappLogoIcon },
+    { href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon },
+    { href: "/personalizacion", label: "Personalización", icon: GearSixIcon },
+    { href: "/integraciones", label: "Integraciones", icon: PlugsConnectedIcon },
+  ];
+}
+
+export function Sidebar({ clinicName, businessType }: { clinicName: string; businessType: BusinessType }) {
   const pathname = usePathname();
+  const NAV_ITEMS = getNavItems(businessType);
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
@@ -55,8 +63,9 @@ export function Sidebar({ clinicName }: { clinicName: string }) {
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ businessType }: { businessType: BusinessType }) {
   const pathname = usePathname();
+  const NAV_ITEMS = getNavItems(businessType);
 
   return (
     <nav className="flex items-center justify-around border-t border-border bg-surface py-1.5 md:hidden">

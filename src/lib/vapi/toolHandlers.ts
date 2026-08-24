@@ -6,6 +6,7 @@ import {
   bookAppointmentSchema,
   cancelAppointmentSchema,
   checkAvailabilitySchema,
+  createOrderSchema,
   requestHumanHandoffSchema,
 } from "@/lib/validation";
 import { TOOL_NAMES } from "@/lib/vapi/tools";
@@ -199,6 +200,63 @@ async function handleCancelAppointment(ctx: ToolHandlerContext, rawArgs: unknown
   return `Listo, cancelé la cita de ${appointment.patient_name} del ${formatLocal(new Date(appointment.start_time), ctx.clinic.timezone)}.`;
 }
 
+function handleGetMenu(ctx: ToolHandlerContext): string {
+  return JSON.stringify(ctx.config.menu_items ?? []);
+}
+
+async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = createOrderSchema.safeParse(rawArgs);
+  if (!parsed.success) {
+    return "Faltan datos para registrar el pedido. Necesito los productos con cantidad, tu nombre, teléfono y si es retiro o envío.";
+  }
+  const data = parsed.data;
+  if (data.orderType === "delivery" && !data.deliveryAddress?.trim()) {
+    return "Para un envío a domicilio necesito la dirección de entrega.";
+  }
+
+  const menu = ctx.config.menu_items ?? [];
+  const notFound: string[] = [];
+  const resolvedItems = data.items.map((item) => {
+    const match = menu.find((menuItem) => menuItem.name.toLowerCase() === item.name.toLowerCase());
+    if (!match) notFound.push(item.name);
+    return {
+      name: match?.name ?? item.name,
+      quantity: item.quantity,
+      unitPrice: match?.price ?? 0,
+      notes: item.notes,
+    };
+  });
+
+  if (notFound.length > 0) {
+    return `No encontré en la carta: ${notFound.join(", ")}. ¿Podés confirmar el nombre exacto del producto?`;
+  }
+
+  const total = resolvedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+  const { data: order, error } = await ctx.admin
+    .from("orders")
+    .insert({
+      clinic_id: ctx.clinic.id,
+      call_id: ctx.callRowId,
+      customer_name: data.customerName,
+      customer_phone: data.customerPhone,
+      order_type: data.orderType,
+      delivery_address: data.orderType === "delivery" ? data.deliveryAddress ?? null : null,
+      items: resolvedItems,
+      total,
+      notes: data.notes ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !order) {
+    console.error("Error al guardar el pedido:", error);
+    return "No pude registrar el pedido, intentemos de nuevo en un momento.";
+  }
+
+  return JSON.stringify({ ordered: true, orderId: order.id, total });
+}
+
 function handleGetClinicInfo(ctx: ToolHandlerContext): string {
   const info = ctx.config.clinic_info;
   return JSON.stringify({
@@ -232,6 +290,10 @@ export async function dispatchToolCall(ctx: ToolHandlerContext, name: string, ra
       return handleGetClinicInfo(ctx);
     case TOOL_NAMES.requestHumanHandoff:
       return handleRequestHumanHandoff(ctx, rawArgs);
+    case TOOL_NAMES.getMenu:
+      return handleGetMenu(ctx);
+    case TOOL_NAMES.createOrder:
+      return handleCreateOrder(ctx, rawArgs);
     default:
       return `Tool no reconocida: ${name}`;
   }

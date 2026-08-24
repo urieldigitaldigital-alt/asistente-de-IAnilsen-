@@ -14,6 +14,8 @@ interface FaqItem {
 interface ClinicInfoFormProps {
   clinicName: string;
   onClinicNameChange: (value: string) => void;
+  businessType: "citas" | "pedidos";
+  onBusinessTypeChange: (value: "citas" | "pedidos") => void;
   clinicPhone: string;
   onClinicPhoneChange: (value: string) => void;
   clinicAddress: string;
@@ -31,6 +33,8 @@ interface ClinicInfoFormProps {
 export function ClinicInfoForm({
   clinicName,
   onClinicNameChange,
+  businessType,
+  onBusinessTypeChange,
   clinicPhone,
   onClinicPhoneChange,
   clinicAddress,
@@ -51,6 +55,21 @@ export function ClinicInfoForm({
         <div>
           <Label htmlFor="clinic_name">Nombre del negocio</Label>
           <Input id="clinic_name" value={clinicName} onChange={(e) => onClinicNameChange(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="business_type">Tipo de negocio</Label>
+          <select
+            id="business_type"
+            value={businessType}
+            onChange={(e) => onBusinessTypeChange(e.target.value as "citas" | "pedidos")}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="citas">Citas (clínica, salón, consultorio…)</option>
+            <option value="pedidos">Pedidos (restaurante, delivery…)</option>
+          </select>
+          <p className="mt-1 text-xs text-muted">
+            Define si el asistente agenda citas o toma pedidos de una carta — cambia el panel y las tools del agente.
+          </p>
         </div>
         <div>
           <Label htmlFor="clinic_phone">Teléfono de recepción</Label>

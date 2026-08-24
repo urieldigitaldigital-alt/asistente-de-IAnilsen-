@@ -5,12 +5,13 @@ import { useActionState, useMemo, useState } from "react";
 import { saveAgentConfigAction, saveAndPublishAgentConfigAction, type AgentConfigActionState } from "@/actions/agentConfig";
 import { BusinessHoursEditor } from "@/components/customize/BusinessHoursEditor";
 import { ClinicInfoForm } from "@/components/customize/ClinicInfoForm";
+import { MenuEditor } from "@/components/customize/MenuEditor";
 import { PromptEditor } from "@/components/customize/PromptEditor";
 import { SandboxChat } from "@/components/customize/SandboxChat";
 import { ServicesEditor } from "@/components/customize/ServicesEditor";
 import { VoiceLanguageSelect } from "@/components/customize/VoiceLanguageSelect";
 import { Button } from "@/components/ui/Button";
-import type { AgentConfig, BusinessHours, Clinic, ClinicService } from "@/types/database";
+import type { AgentConfig, BusinessHours, BusinessType, Clinic, ClinicService, MenuItem } from "@/types/database";
 
 const idleState: AgentConfigActionState = { error: null, success: null };
 
@@ -34,6 +35,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [handoffMessage, setHandoffMessage] = useState(config.handoff_message ?? "");
 
   const [clinicName, setClinicName] = useState(clinic.name);
+  const [businessType, setBusinessType] = useState<BusinessType>(clinic.business_type);
   const [clinicPhone, setClinicPhone] = useState(clinic.phone ?? "");
   const [clinicAddress, setClinicAddress] = useState(clinic.address ?? "");
   const [timezone, setTimezone] = useState(clinic.timezone);
@@ -43,6 +45,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [faq, setFaq] = useState(config.clinic_info.faq ?? []);
 
   const [services, setServices] = useState<ClinicService[]>(config.services);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(config.menu_items ?? []);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(config.business_hours);
 
   const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
@@ -61,6 +64,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         tone,
         clinic_info: { policies, paymentMethods, faq },
         services,
+        menu_items: menuItems,
         business_hours: businessHours,
         voice: { provider: voiceProvider, voiceId, speed },
         language,
@@ -75,6 +79,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       paymentMethods,
       faq,
       services,
+      menuItems,
       businessHours,
       voiceProvider,
       voiceId,
@@ -87,8 +92,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   );
 
   const clinicJson = useMemo(
-    () => JSON.stringify({ name: clinicName, phone: clinicPhone, address: clinicAddress, timezone }),
-    [clinicName, clinicPhone, clinicAddress, timezone]
+    () => JSON.stringify({ name: clinicName, business_type: businessType, phone: clinicPhone, address: clinicAddress, timezone }),
+    [clinicName, businessType, clinicPhone, clinicAddress, timezone]
   );
 
   return (
@@ -107,6 +112,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       <ClinicInfoForm
         clinicName={clinicName}
         onClinicNameChange={setClinicName}
+        businessType={businessType}
+        onBusinessTypeChange={setBusinessType}
         clinicPhone={clinicPhone}
         onClinicPhoneChange={setClinicPhone}
         clinicAddress={clinicAddress}
@@ -121,7 +128,11 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         onFaqChange={setFaq}
       />
 
-      <ServicesEditor services={services} onChange={setServices} />
+      {businessType === "pedidos" ? (
+        <MenuEditor menuItems={menuItems} onChange={setMenuItems} />
+      ) : (
+        <ServicesEditor services={services} onChange={setServices} />
+      )}
       <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
       <VoiceLanguageSelect
         voiceProvider={voiceProvider}

@@ -8,10 +8,13 @@ export const TOOL_NAMES = {
   cancelAppointment: "cancelAppointment",
   getClinicInfo: "getClinicInfo",
   requestHumanHandoff: "requestHumanHandoff",
+  getMenu: "getMenu",
+  createOrder: "createOrder",
 } as const;
 
 interface BuildToolsParams {
   receptionPhoneNumber?: string;
+  businessType?: "citas" | "pedidos";
 }
 
 /**
@@ -23,76 +26,123 @@ interface BuildToolsParams {
  * `transferCall` es nativa de Vapi, no debe imitarse con una function tool
  * (ver skill create-tool de Vapi).
  */
+const CITAS_TOOLS: OpenAiModelToolsItem[] = [
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.checkAvailability,
+      description:
+        "Consulta si hay disponibilidad para un servicio en una fecha/hora, respetando el horario de atención del negocio. Si el horario pedido no está libre, devuelve hasta 3 alternativas.",
+      parameters: {
+        type: "object",
+        properties: {
+          treatment: { type: "string", description: "Servicio solicitado (según los servicios configurados por el negocio)." },
+          datetime: {
+            type: "string",
+            description:
+              "Fecha y hora solicitadas, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
+          },
+          durationMinutes: { type: "number", description: "Duración estimada de la cita en minutos." },
+          daysAhead: { type: "number", description: "Días hacia adelante a considerar si no se pide una fecha exacta (1-30)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.bookAppointment,
+      description: "Agenda una cita confirmada. Llama primero a checkAvailability para confirmar el horario.",
+      parameters: {
+        type: "object",
+        properties: {
+          datetime: {
+            type: "string",
+            description:
+              "Fecha y hora de la cita, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
+          },
+          durationMinutes: { type: "number", description: "Duración de la cita en minutos." },
+          patientName: { type: "string", description: "Nombre completo del cliente." },
+          patientPhone: { type: "string", description: "Teléfono del cliente." },
+          patientEmail: { type: "string", description: "Correo del cliente (opcional)." },
+          treatment: { type: "string", description: "Servicio a realizar." },
+          isNewPatient: { type: "boolean", description: "Si es la primera vez del cliente en el negocio." },
+          notes: { type: "string", description: "Notas adicionales (opcional)." },
+        },
+        required: ["datetime", "durationMinutes", "patientName", "patientPhone", "treatment", "isNewPatient"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.cancelAppointment,
+      description: "Cancela una cita existente, identificada por el cliente y la fecha.",
+      parameters: {
+        type: "object",
+        properties: {
+          eventId: { type: "string", description: "ID del evento de Google Calendar, si se conoce." },
+          patientName: { type: "string", description: "Nombre del cliente." },
+          patientPhone: { type: "string", description: "Teléfono del cliente." },
+          datetime: {
+            type: "string",
+            description:
+              "Fecha y hora aproximadas de la cita a cancelar, en hora local del negocio, formato AAAA-MM-DDTHH:MM:SS.",
+          },
+        },
+      },
+    },
+  },
+];
+
+const PEDIDOS_TOOLS: OpenAiModelToolsItem[] = [
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.getMenu,
+      description: "Devuelve la carta completa del negocio (nombre, precio, descripción y categoría de cada producto).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.createOrder,
+      description:
+        "Registra un pedido confirmado con sus productos y cantidades. Llama a getMenu primero si todavía no conocés los precios exactos.",
+      parameters: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            description: "Productos pedidos, con el nombre exacto tal como aparece en la carta.",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Nombre exacto del producto según la carta." },
+                quantity: { type: "number", description: "Cantidad pedida." },
+                notes: { type: "string", description: "Aclaraciones del producto (ej. 'sin cebolla')." },
+              },
+              required: ["name", "quantity"],
+            },
+          },
+          customerName: { type: "string", description: "Nombre del cliente." },
+          customerPhone: { type: "string", description: "Teléfono del cliente." },
+          orderType: { type: "string", enum: ["pickup", "delivery"], description: "'pickup' si retira en el local, 'delivery' si es envío a domicilio." },
+          deliveryAddress: { type: "string", description: "Dirección de entrega, obligatoria si orderType es 'delivery'." },
+          notes: { type: "string", description: "Notas generales del pedido (opcional)." },
+        },
+        required: ["items", "customerName", "customerPhone", "orderType"],
+      },
+    },
+  },
+];
+
 export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelToolsItem[] {
-  const { receptionPhoneNumber } = params;
+  const { receptionPhoneNumber, businessType = "citas" } = params;
 
   const tools: OpenAiModelToolsItem[] = [
-    {
-      type: "function",
-      function: {
-        name: TOOL_NAMES.checkAvailability,
-        description:
-          "Consulta si hay disponibilidad para un servicio en una fecha/hora, respetando el horario de atención del negocio. Si el horario pedido no está libre, devuelve hasta 3 alternativas.",
-        parameters: {
-          type: "object",
-          properties: {
-            treatment: { type: "string", description: "Servicio solicitado (según los servicios configurados por el negocio)." },
-            datetime: {
-              type: "string",
-              description:
-                "Fecha y hora solicitadas, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
-            },
-            durationMinutes: { type: "number", description: "Duración estimada de la cita en minutos." },
-            daysAhead: { type: "number", description: "Días hacia adelante a considerar si no se pide una fecha exacta (1-30)." },
-          },
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: TOOL_NAMES.bookAppointment,
-        description: "Agenda una cita confirmada. Llama primero a checkAvailability para confirmar el horario.",
-        parameters: {
-          type: "object",
-          properties: {
-            datetime: {
-              type: "string",
-              description:
-                "Fecha y hora de la cita, en hora local del negocio (no hace falta zona horaria), formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T15:00:00. Usa siempre el año real indicado en el contexto del negocio, nunca un año anterior.",
-            },
-            durationMinutes: { type: "number", description: "Duración de la cita en minutos." },
-            patientName: { type: "string", description: "Nombre completo del cliente." },
-            patientPhone: { type: "string", description: "Teléfono del cliente." },
-            patientEmail: { type: "string", description: "Correo del cliente (opcional)." },
-            treatment: { type: "string", description: "Servicio a realizar." },
-            isNewPatient: { type: "boolean", description: "Si es la primera vez del cliente en el negocio." },
-            notes: { type: "string", description: "Notas adicionales (opcional)." },
-          },
-          required: ["datetime", "durationMinutes", "patientName", "patientPhone", "treatment", "isNewPatient"],
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: TOOL_NAMES.cancelAppointment,
-        description: "Cancela una cita existente, identificada por el cliente y la fecha.",
-        parameters: {
-          type: "object",
-          properties: {
-            eventId: { type: "string", description: "ID del evento de Google Calendar, si se conoce." },
-            patientName: { type: "string", description: "Nombre del cliente." },
-            patientPhone: { type: "string", description: "Teléfono del cliente." },
-            datetime: {
-              type: "string",
-              description:
-                "Fecha y hora aproximadas de la cita a cancelar, en hora local del negocio, formato AAAA-MM-DDTHH:MM:SS.",
-            },
-          },
-        },
-      },
-    },
+    ...(businessType === "pedidos" ? PEDIDOS_TOOLS : CITAS_TOOLS),
     {
       type: "function",
       function: {

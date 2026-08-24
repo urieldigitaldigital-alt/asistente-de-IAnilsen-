@@ -40,6 +40,23 @@ export const requestHumanHandoffSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const createOrderSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        quantity: z.number().int().positive(),
+        notes: z.string().optional(),
+      })
+    )
+    .min(1),
+  customerName: z.string().min(1),
+  customerPhone: z.string().min(1),
+  orderType: z.enum(["pickup", "delivery"]),
+  deliveryAddress: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Personalización (formularios del panel)
 // ---------------------------------------------------------------------------
@@ -67,6 +84,13 @@ export const clinicServiceSchema = z.object({
   description: z.string().optional(),
 });
 
+export const menuItemSchema = z.object({
+  name: z.string().min(1),
+  price: z.number().nonnegative(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+});
+
 export const clinicInfoSchema = z.object({
   policies: z.string().optional(),
   paymentMethods: z.array(z.string()).optional(),
@@ -78,6 +102,7 @@ export const agentConfigFormSchema = z.object({
   tone: z.string(),
   clinic_info: clinicInfoSchema,
   services: z.array(clinicServiceSchema),
+  menu_items: z.array(menuItemSchema),
   business_hours: businessHoursSchema,
   voice: z.object({
     provider: z.string(),
@@ -106,6 +131,7 @@ export const clinicDetailsSchema = z.object({
     }),
   address: z.string().optional(),
   timezone: z.string().min(1),
+  business_type: z.enum(["citas", "pedidos"]),
 });
 
 export const vapiPhoneNumberFormSchema = z.object({

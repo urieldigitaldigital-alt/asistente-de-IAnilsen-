@@ -93,7 +93,7 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
 
   const systemPrompt = buildSystemPrompt(clinic, config);
   const firstMessage = buildFirstMessage(config, clinic);
-  const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined });
+  const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
   const vapi = await getTenantVapiClient(clinic.id, supabase);
   const payload = {

@@ -2,6 +2,8 @@ import {
   CalendarCheckIcon,
   ChatsCircleIcon,
   ClockIcon,
+  CookingPotIcon,
+  ForkKnifeIcon,
   PhoneIcon,
   TrendUpIcon,
   WarningCircleIcon,
@@ -32,17 +34,27 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile icon={PhoneIcon} label="Llamadas hoy" value={String(data.callsToday)} />
-        <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.appointmentsScheduled)} />
-        <StatTile
-          icon={ClockIcon}
-          label="Duración promedio"
-          value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
-        />
-        <StatTile
-          icon={TrendUpIcon}
-          label="Tasa de agendamiento"
-          value={data.bookingRatePct !== null ? `${data.bookingRatePct}%` : "—"}
-        />
+        {data.businessType === "pedidos" ? (
+          <>
+            <StatTile icon={ForkKnifeIcon} label="Pedidos hoy" value={String(data.ordersToday)} />
+            <StatTile icon={CookingPotIcon} label="En preparación" value={String(data.ordersInPreparation)} />
+            <StatTile icon={TrendUpIcon} label="Listos para entregar" value={String(data.ordersReady)} />
+          </>
+        ) : (
+          <>
+            <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.appointmentsScheduled)} />
+            <StatTile
+              icon={ClockIcon}
+              label="Duración promedio"
+              value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
+            />
+            <StatTile
+              icon={TrendUpIcon}
+              label="Tasa de agendamiento"
+              value={data.bookingRatePct !== null ? `${data.bookingRatePct}%` : "—"}
+            />
+          </>
+        )}
       </div>
 
       <div>

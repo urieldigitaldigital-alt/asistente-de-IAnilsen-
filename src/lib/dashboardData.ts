@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/types/database";
+import type { BusinessType, Database } from "@/types/database";
 
 export interface DashboardChartPoint {
   day: string;
@@ -17,6 +17,7 @@ export interface DashboardRecentCall {
 }
 
 export interface DashboardData {
+  businessType: BusinessType;
   callsToday: number;
   callsWeek: number;
   appointmentsScheduled: number;
@@ -30,6 +31,9 @@ export interface DashboardData {
   whatsappMessagesToday: number;
   whatsappConversationsActive: number;
   whatsappNeedsFollowUp: number;
+  ordersToday: number;
+  ordersInPreparation: number;
+  ordersReady: number;
 }
 
 function startOfDay(date: Date): Date {
@@ -59,6 +63,10 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     whatsappMessagesTodayRes,
     whatsappActiveRes,
     whatsappFollowUpRes,
+    clinicRes,
+    ordersTodayRes,
+    ordersInPreparationRes,
+    ordersReadyRes,
   ] = await Promise.all([
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
@@ -79,6 +87,10 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     supabase.from("whatsapp_messages").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "needs_follow_up"),
+    supabase.from("clinics").select("business_type").single(),
+    supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
+    supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "en_preparacion"),
+    supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "listo"),
   ]);
 
   const weekCalls = weekCallsRes.data ?? [];
@@ -123,6 +135,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   }));
 
   return {
+    businessType: clinicRes.data?.business_type ?? "citas",
     callsToday: callsTodayRes.count ?? 0,
     callsWeek: callsWeekCount,
     appointmentsScheduled: appointmentsScheduledRes.count ?? 0,
@@ -136,5 +149,8 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     whatsappMessagesToday: whatsappMessagesTodayRes.count ?? 0,
     whatsappConversationsActive: whatsappActiveRes.count ?? 0,
     whatsappNeedsFollowUp: whatsappFollowUpRes.count ?? 0,
+    ordersToday: ordersTodayRes.count ?? 0,
+    ordersInPreparation: ordersInPreparationRes.count ?? 0,
+    ordersReady: ordersReadyRes.count ?? 0,
   };
 }

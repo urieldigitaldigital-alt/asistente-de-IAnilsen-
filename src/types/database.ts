@@ -3,6 +3,9 @@ export type ProfileRole = "owner" | "staff";
 export type TranscriptRole = "assistant" | "user";
 export type WhatsappConversationStatus = "active" | "needs_follow_up" | "resolved";
 export type WhatsappMessageRole = "customer" | "assistant";
+export type BusinessType = "citas" | "pedidos";
+export type OrderType = "pickup" | "delivery";
+export type OrderStatus = "recibido" | "en_preparacion" | "listo" | "entregado" | "cancelado";
 
 export interface DayHours {
   start: string; // "09:00"
@@ -20,6 +23,20 @@ export interface ClinicService {
   name: string;
   duration_minutes: number;
   description?: string;
+}
+
+export interface MenuItem {
+  name: string;
+  price: number;
+  description?: string;
+  category?: string;
+}
+
+export interface OrderItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  notes?: string;
 }
 
 export interface ClinicInfo {
@@ -53,6 +70,7 @@ export interface Database {
           timezone: string;
           phone: string | null;
           address: string | null;
+          business_type: BusinessType;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["clinics"]["Row"]> & {
@@ -84,6 +102,7 @@ export interface Database {
           tone: string;
           clinic_info: ClinicInfo;
           services: ClinicService[];
+          menu_items: MenuItem[];
           business_hours: BusinessHours;
           voice: AgentVoiceConfig;
           language: string;
@@ -240,6 +259,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["appointments"]["Row"]>;
         Relationships: [];
       };
+      orders: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          call_id: string | null;
+          customer_name: string;
+          customer_phone: string;
+          order_type: OrderType;
+          delivery_address: string | null;
+          items: OrderItem[];
+          total: number;
+          status: OrderStatus;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["orders"]["Row"]> & {
+          clinic_id: string;
+          customer_name: string;
+          customer_phone: string;
+          items: OrderItem[];
+          total: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
+        Relationships: [];
+      };
       transcripts: {
         Row: {
           id: string;
@@ -279,4 +324,5 @@ export type WhatsappSession = Database["public"]["Tables"]["whatsapp_sessions"][
 export type WhatsappMessage = Database["public"]["Tables"]["whatsapp_messages"]["Row"];
 export type Call = Database["public"]["Tables"]["calls"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
+export type Order = Database["public"]["Tables"]["orders"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];
