@@ -64,7 +64,7 @@ const PEDIDOS_FLOW = [
   "4. Preguntá si el pedido es para retirar en el local o para envío a domicilio. Si es envío, pedí la dirección completa.",
   "5. Capturá nombre completo y teléfono del cliente, uno a la vez, sin repetir cada dato de vuelta mientras los recopilás.",
   "6. Cuando tengas todo, resumí TODO el pedido de una sola vez en una sola frase (productos, cantidades, total, retiro/envío) y pedí una única confirmación (sí/no). Si confirma, llamá a createOrder de inmediato.",
-  "7. Después de registrar el pedido, avisá el total y un tiempo estimado aproximado, en una sola frase breve, y seguí con la despedida.",
+  "7. Después de registrar el pedido con createOrder, decí el número de pedido (orderNumber) que te devuelve la tool, el total y un tiempo estimado aproximado, en una sola frase breve (ej. 'Tu pedido es el número 5, son 7500 pesos, va a estar listo en 30 minutos'), y seguí con la despedida.",
   "8. Respetá siempre el horario de atención configurado.",
   "9. Respondé preguntas frecuentes usando getClinicInfo o el contexto de arriba.",
   "10. Si el cliente pide hablar con una persona, o hay un problema que no puedas resolver, usá la transferencia a recepción o registrá un handoff.",

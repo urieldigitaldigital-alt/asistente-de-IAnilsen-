@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { updateOrderStatusAction } from "@/actions/orders";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderStatus } from "@/types/database";
 
@@ -60,6 +61,7 @@ function PrintTicket({ order, clinicName, timeZone }: { order: Order | null; cli
   return (
     <div className="hidden print:block print:w-full print:font-mono print:text-black">
       <p className="text-center text-base font-bold">{clinicName}</p>
+      <p className="text-center text-2xl font-bold">Pedido #{order.order_number}</p>
       <p className="text-center text-xs">{formatTicketDateTime(order.created_at, timeZone)}</p>
       <p className="my-1 border-t border-dashed border-black" />
       <p className="text-sm font-bold">{order.order_type === "delivery" ? "ENVÍO A DOMICILIO" : "RETIRA EN EL LOCAL"}</p>
@@ -104,7 +106,9 @@ function OrderCard({
     <div className="space-y-2 rounded-lg border border-border bg-background p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-medium">{order.customer_name}</p>
+          <p className="font-medium">
+            <span className="text-primary">#{order.order_number}</span> {order.customer_name}
+          </p>
           <p className="text-xs text-muted">{order.customer_phone}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -183,6 +187,8 @@ export function OrdersBoard({
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
   const autoPrintRef = useRef(autoPrint);
   autoPrintRef.current = autoPrint;
+
+  const [search, setSearch] = useState("");
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -264,6 +270,18 @@ export function OrdersBoard({
   );
   const cancelled = orders.filter((o) => o.status === "cancelado");
 
+  const trimmedSearch = search.trim().toLowerCase();
+  const searchResults = trimmedSearch
+    ? orders
+        .filter(
+          (o) =>
+            String(o.order_number).includes(trimmedSearch) ||
+            o.customer_name.toLowerCase().includes(trimmedSearch) ||
+            o.customer_phone.includes(trimmedSearch)
+        )
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : null;
+
   return (
     <>
       <div className="space-y-4 print:hidden">
@@ -290,6 +308,27 @@ export function OrdersBoard({
           </label>
         </Card>
 
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por número de pedido, nombre o teléfono…"
+        />
+
+        {searchResults ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted">
+              {searchResults.length === 0
+                ? "Sin resultados."
+                : `${searchResults.length} resultado${searchResults.length === 1 ? "" : "s"}`}
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {searchResults.map((order) => (
+                <OrderCard key={order.id} order={order} timeZone={timeZone} disabled={isPending} onPrint={handlePrint} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {ACTIVE_STATUS_COLUMNS.map(({ status, label }) => {
             const columnOrders = sortByArrival(
@@ -333,6 +372,8 @@ export function OrdersBoard({
               ))}
             </div>
           </details>
+        )}
+          </>
         )}
       </div>
 

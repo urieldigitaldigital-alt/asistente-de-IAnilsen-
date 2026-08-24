@@ -264,6 +264,7 @@ export interface Database {
           id: string;
           clinic_id: string;
           call_id: string | null;
+          order_number: number;
           customer_name: string;
           customer_phone: string;
           order_type: OrderType;

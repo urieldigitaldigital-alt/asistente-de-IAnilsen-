@@ -246,7 +246,7 @@ async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Pro
       total,
       notes: data.notes ?? null,
     })
-    .select("id")
+    .select("id, order_number")
     .single();
 
   if (error || !order) {
@@ -254,7 +254,7 @@ async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Pro
     return "No pude registrar el pedido, intentemos de nuevo en un momento.";
   }
 
-  return JSON.stringify({ ordered: true, orderId: order.id, total });
+  return JSON.stringify({ ordered: true, orderId: order.id, orderNumber: order.order_number, total });
 }
 
 function handleGetClinicInfo(ctx: ToolHandlerContext): string {
