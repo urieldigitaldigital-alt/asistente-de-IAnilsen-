@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { CUSTOM_TIMEZONE_VALUE, TIMEZONE_OPTIONS } from "@/lib/timezones";
+import type { BusinessType } from "@/types/database";
 
 interface FaqItem {
   question: string;
@@ -16,8 +17,8 @@ interface FaqItem {
 interface ClinicInfoFormProps {
   clinicName: string;
   onClinicNameChange: (value: string) => void;
-  businessType: "citas" | "pedidos";
-  onBusinessTypeChange: (value: "citas" | "pedidos") => void;
+  businessType: BusinessType;
+  onBusinessTypeChange: (value: BusinessType) => void;
   clinicPhone: string;
   onClinicPhoneChange: (value: string) => void;
   clinicAddress: string;
@@ -63,14 +64,17 @@ export function ClinicInfoForm({
           <select
             id="business_type"
             value={businessType}
-            onChange={(e) => onBusinessTypeChange(e.target.value as "citas" | "pedidos")}
+            onChange={(e) => onBusinessTypeChange(e.target.value as BusinessType)}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="citas">Citas (clínica, salón, consultorio…)</option>
-            <option value="pedidos">Pedidos (restaurante, delivery…)</option>
+            <option value="citas">Citas (clínica, salón, barbería, consultorio…)</option>
+            <option value="pedidos">Pedidos (rotisería, delivery, sin mesas)</option>
+            <option value="restaurante">Restaurante (carta + mesas y reservas)</option>
+            <option value="inmobiliaria">Inmobiliaria (propiedades y visitas)</option>
+            <option value="llamadas">Llamadas (solo toma consultas y teléfono)</option>
           </select>
           <p className="mt-1 text-xs text-muted">
-            Define si el asistente agenda citas o toma pedidos de una carta — cambia el panel y las tools del agente.
+            Define qué hace el asistente y qué pantallas ves en el panel — cambiarlo actualiza ambos.
           </p>
         </div>
         <div>

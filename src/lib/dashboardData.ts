@@ -16,6 +16,15 @@ export interface DashboardRecentCall {
   summary: string | null;
 }
 
+export interface DashboardInquiry {
+  id: string;
+  customerName: string | null;
+  customerPhone: string;
+  reason: string;
+  contacted: boolean;
+  createdAt: string;
+}
+
 export interface DashboardData {
   businessType: BusinessType;
   callsToday: number;
@@ -34,6 +43,9 @@ export interface DashboardData {
   ordersToday: number;
   ordersInPreparation: number;
   ordersReady: number;
+  inquiriesToday: number;
+  inquiriesPending: number;
+  recentInquiries: DashboardInquiry[];
 }
 
 function startOfDay(date: Date): Date {
@@ -67,6 +79,9 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     ordersTodayRes,
     ordersInPreparationRes,
     ordersReadyRes,
+    inquiriesTodayRes,
+    inquiriesPendingRes,
+    recentInquiriesRes,
   ] = await Promise.all([
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
@@ -91,6 +106,13 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "en_preparacion"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "listo"),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("contacted", false),
+    supabase
+      .from("inquiries")
+      .select("id, customer_name, customer_phone, reason, contacted, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   const weekCalls = weekCallsRes.data ?? [];
@@ -152,5 +174,15 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     ordersToday: ordersTodayRes.count ?? 0,
     ordersInPreparation: ordersInPreparationRes.count ?? 0,
     ordersReady: ordersReadyRes.count ?? 0,
+    inquiriesToday: inquiriesTodayRes.count ?? 0,
+    inquiriesPending: inquiriesPendingRes.count ?? 0,
+    recentInquiries: (recentInquiriesRes.data ?? []).map((row) => ({
+      id: row.id,
+      customerName: row.customer_name,
+      customerPhone: row.customer_phone,
+      reason: row.reason,
+      contacted: row.contacted,
+      createdAt: row.created_at,
+    })),
   };
 }

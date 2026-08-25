@@ -57,6 +57,32 @@ export const createOrderSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const reserveTableSchema = z.object({
+  customerName: z.string().min(1),
+  customerPhone: z.string().min(1),
+  partySize: z.number().int().positive(),
+  reservationTime: flexibleDatetime,
+  notes: z.string().optional(),
+});
+
+export const getPropertiesSchema = z.object({
+  maxPrice: z.number().positive().optional(),
+});
+
+export const scheduleVisitSchema = z.object({
+  propertyId: z.string().min(1),
+  visitTime: flexibleDatetime,
+  customerName: z.string().min(1),
+  customerPhone: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+export const logInquirySchema = z.object({
+  customerName: z.string().optional(),
+  customerPhone: z.string().min(1),
+  reason: z.string().min(1),
+});
+
 // ---------------------------------------------------------------------------
 // Personalización (formularios del panel)
 // ---------------------------------------------------------------------------
@@ -89,6 +115,13 @@ export const menuItemSchema = z.object({
   price: z.number().nonnegative(),
   description: z.string().optional(),
   category: z.string().optional(),
+});
+
+export const propertyFormSchema = z.object({
+  title: z.string().min(1),
+  address: z.string().min(1),
+  price: z.number().nonnegative(),
+  description: z.string().optional(),
 });
 
 export const clinicInfoSchema = z.object({
@@ -131,7 +164,7 @@ export const clinicDetailsSchema = z.object({
     }),
   address: z.string().optional(),
   timezone: z.string().min(1),
-  business_type: z.enum(["citas", "pedidos"]),
+  business_type: z.enum(["citas", "pedidos", "restaurante", "inmobiliaria", "llamadas"]),
 });
 
 export const vapiPhoneNumberFormSchema = z.object({

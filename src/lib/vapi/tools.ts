@@ -10,11 +10,15 @@ export const TOOL_NAMES = {
   requestHumanHandoff: "requestHumanHandoff",
   getMenu: "getMenu",
   createOrder: "createOrder",
+  reserveTable: "reserveTable",
+  getProperties: "getProperties",
+  scheduleVisit: "scheduleVisit",
+  logInquiry: "logInquiry",
 } as const;
 
 interface BuildToolsParams {
   receptionPhoneNumber?: string;
-  businessType?: "citas" | "pedidos";
+  businessType?: "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
 }
 
 /**
@@ -138,11 +142,110 @@ const PEDIDOS_TOOLS: OpenAiModelToolsItem[] = [
   },
 ];
 
+const RESERVE_TABLE_TOOL: OpenAiModelToolsItem = {
+  type: "function",
+  function: {
+    name: TOOL_NAMES.reserveTable,
+    description:
+      "Registra una solicitud de reserva de mesa para comer en el local (no un pedido para retirar/enviar). No asigna una mesa específica — eso lo hace el local a mano.",
+    parameters: {
+      type: "object",
+      properties: {
+        customerName: { type: "string", description: "Nombre del cliente." },
+        customerPhone: { type: "string", description: "Teléfono del cliente." },
+        partySize: { type: "number", description: "Cantidad de personas." },
+        reservationTime: {
+          type: "string",
+          description:
+            "Fecha y hora pedida, en hora local del negocio, formato AAAA-MM-DDTHH:MM:SS, ej. 2026-08-23T21:00:00. Usa siempre el año real indicado en el contexto del negocio.",
+        },
+        notes: { type: "string", description: "Aclaraciones de la reserva (opcional)." },
+      },
+      required: ["customerName", "customerPhone", "partySize", "reservationTime"],
+    },
+  },
+};
+
+const RESTAURANTE_TOOLS: OpenAiModelToolsItem[] = [...PEDIDOS_TOOLS, RESERVE_TABLE_TOOL];
+
+const INMOBILIARIA_TOOLS: OpenAiModelToolsItem[] = [
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.getProperties,
+      description: "Devuelve el listado de propiedades disponibles (dirección, precio, descripción) que coinciden con lo que busca el cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          maxPrice: { type: "number", description: "Precio máximo, si el cliente dio un presupuesto (opcional)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.scheduleVisit,
+      description: "Registra una solicitud de visita a una propiedad específica. Llamá primero a getProperties para conocer el ID exacto de la propiedad.",
+      parameters: {
+        type: "object",
+        properties: {
+          propertyId: { type: "string", description: "ID de la propiedad, tal como lo devuelve getProperties." },
+          visitTime: {
+            type: "string",
+            description:
+              "Fecha y hora pedida para la visita, en hora local del negocio, formato AAAA-MM-DDTHH:MM:SS. Usa siempre el año real indicado en el contexto del negocio.",
+          },
+          customerName: { type: "string", description: "Nombre del cliente." },
+          customerPhone: { type: "string", description: "Teléfono del cliente." },
+          notes: { type: "string", description: "Aclaraciones de la visita (opcional)." },
+        },
+        required: ["propertyId", "visitTime", "customerName", "customerPhone"],
+      },
+    },
+  },
+];
+
+const LLAMADAS_TOOLS: OpenAiModelToolsItem[] = [
+  {
+    type: "function",
+    function: {
+      name: TOOL_NAMES.logInquiry,
+      description: "Anota la consulta del cliente y su teléfono para que alguien del negocio lo llame. Usar siempre antes de despedirse.",
+      parameters: {
+        type: "object",
+        properties: {
+          customerName: { type: "string", description: "Nombre del cliente, si lo dio." },
+          customerPhone: { type: "string", description: "Teléfono del cliente." },
+          reason: { type: "string", description: "Resumen breve de qué necesita el cliente." },
+        },
+        required: ["customerPhone", "reason"],
+      },
+    },
+  },
+];
+
+function domainTools(businessType: NonNullable<BuildToolsParams["businessType"]>): OpenAiModelToolsItem[] {
+  switch (businessType) {
+    case "pedidos":
+      return PEDIDOS_TOOLS;
+    case "restaurante":
+      return RESTAURANTE_TOOLS;
+    case "inmobiliaria":
+      return INMOBILIARIA_TOOLS;
+    case "llamadas":
+      return LLAMADAS_TOOLS;
+    case "citas":
+    default:
+      return CITAS_TOOLS;
+  }
+}
+
 export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelToolsItem[] {
   const { receptionPhoneNumber, businessType = "citas" } = params;
 
   const tools: OpenAiModelToolsItem[] = [
-    ...(businessType === "pedidos" ? PEDIDOS_TOOLS : CITAS_TOOLS),
+    ...domainTools(businessType),
     {
       type: "function",
       function: {

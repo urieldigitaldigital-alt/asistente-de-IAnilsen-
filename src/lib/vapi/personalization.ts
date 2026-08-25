@@ -13,25 +13,46 @@ function phoneSuffix(phone: string): string {
 }
 
 async function findReturningCustomerName(admin: AdminClient, clinic: Clinic, suffix: string): Promise<string | null> {
-  if (clinic.business_type === "pedidos") {
-    const { data } = await admin
-      .from("orders")
-      .select("customer_name, customer_phone")
-      .eq("clinic_id", clinic.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const match = (data ?? []).find((row) => phoneSuffix(row.customer_phone) === suffix);
-    return match?.customer_name ?? null;
+  switch (clinic.business_type) {
+    case "pedidos":
+    case "restaurante": {
+      const { data } = await admin
+        .from("orders")
+        .select("customer_name, customer_phone")
+        .eq("clinic_id", clinic.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data ?? []).find((row) => phoneSuffix(row.customer_phone) === suffix)?.customer_name ?? null;
+    }
+    case "inmobiliaria": {
+      const { data } = await admin
+        .from("property_visits")
+        .select("customer_name, customer_phone")
+        .eq("clinic_id", clinic.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data ?? []).find((row) => phoneSuffix(row.customer_phone) === suffix)?.customer_name ?? null;
+    }
+    case "llamadas": {
+      const { data } = await admin
+        .from("inquiries")
+        .select("customer_name, customer_phone")
+        .eq("clinic_id", clinic.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data ?? []).find((row) => phoneSuffix(row.customer_phone) === suffix)?.customer_name ?? null;
+    }
+    case "citas":
+    default: {
+      const { data } = await admin
+        .from("appointments")
+        .select("patient_name, patient_phone")
+        .eq("clinic_id", clinic.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data ?? []).find((row) => phoneSuffix(row.patient_phone) === suffix)?.patient_name ?? null;
+    }
   }
-
-  const { data } = await admin
-    .from("appointments")
-    .select("patient_name, patient_phone")
-    .eq("clinic_id", clinic.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  const match = (data ?? []).find((row) => phoneSuffix(row.patient_phone) === suffix);
-  return match?.patient_name ?? null;
 }
 
 /**
@@ -56,9 +77,11 @@ export async function buildPersonalizedFirstMessage(
     const firstName = fullName?.trim().split(/\s+/)[0];
     if (!firstName) return fallback;
 
-    return clinic.business_type === "pedidos"
-      ? `¡Hola ${firstName}! Qué bueno tenerte de vuelta en ${clinic.name}. ¿Qué te gustaría pedir hoy?`
-      : `¡Hola ${firstName}! Qué bueno tenerte de vuelta en ${clinic.name}. ¿En qué te puedo ayudar hoy?`;
+    const help =
+      clinic.business_type === "pedidos" || clinic.business_type === "restaurante"
+        ? "¿Qué te gustaría pedir hoy?"
+        : "¿En qué te puedo ayudar hoy?";
+    return `¡Hola ${firstName}! Qué bueno tenerte de vuelta en ${clinic.name}. ${help}`;
   } catch (err) {
     console.error("Error buscando cliente recurrente:", err);
     return fallback;

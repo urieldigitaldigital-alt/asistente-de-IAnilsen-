@@ -5,8 +5,10 @@ import {
   ChatCircleTextIcon,
   ForkKnifeIcon,
   GearSixIcon,
+  HouseLineIcon,
   PlugsConnectedIcon,
   SquaresFourIcon,
+  TableIcon,
   WhatsappLogoIcon,
 } from "@phosphor-icons/react";
 import Image from "next/image";
@@ -15,12 +17,31 @@ import { usePathname } from "next/navigation";
 
 import type { BusinessType } from "@/types/database";
 
+// Cada rubro solo ve las pantallas que le corresponden — "llamadas" no tiene
+// ninguna pantalla de dominio propia (solo toma consultas por teléfono).
+function getDomainNavItems(businessType: BusinessType) {
+  switch (businessType) {
+    case "pedidos":
+      return [{ href: "/pedidos", label: "Pedidos", icon: ForkKnifeIcon }];
+    case "restaurante":
+      return [
+        { href: "/pedidos", label: "Pedidos", icon: ForkKnifeIcon },
+        { href: "/mesas", label: "Mesas", icon: TableIcon },
+      ];
+    case "inmobiliaria":
+      return [{ href: "/propiedades", label: "Propiedades", icon: HouseLineIcon }];
+    case "llamadas":
+      return [];
+    case "citas":
+    default:
+      return [{ href: "/calendario", label: "Calendario", icon: CalendarBlankIcon }];
+  }
+}
+
 function getNavItems(businessType: BusinessType) {
   return [
     { href: "/dashboard", label: "Dashboard", icon: SquaresFourIcon },
-    businessType === "pedidos"
-      ? { href: "/pedidos", label: "Pedidos", icon: ForkKnifeIcon }
-      : { href: "/calendario", label: "Calendario", icon: CalendarBlankIcon },
+    ...getDomainNavItems(businessType),
     { href: "/whatsapp", label: "WhatsApp", icon: WhatsappLogoIcon },
     { href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon },
     { href: "/personalizacion", label: "Personalización", icon: GearSixIcon },

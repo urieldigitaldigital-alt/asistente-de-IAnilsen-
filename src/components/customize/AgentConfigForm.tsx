@@ -128,11 +128,11 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         onFaqChange={setFaq}
       />
 
-      {businessType === "pedidos" ? (
+      {businessType === "pedidos" || businessType === "restaurante" ? (
         <MenuEditor menuItems={menuItems} onChange={setMenuItems} />
-      ) : (
+      ) : businessType === "citas" ? (
         <ServicesEditor services={services} onChange={setServices} />
-      )}
+      ) : null}
       <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
       <VoiceLanguageSelect
         voiceProvider={voiceProvider}

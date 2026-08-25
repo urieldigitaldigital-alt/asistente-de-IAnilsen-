@@ -7,7 +7,11 @@ import {
   cancelAppointmentSchema,
   checkAvailabilitySchema,
   createOrderSchema,
+  getPropertiesSchema,
+  logInquirySchema,
   requestHumanHandoffSchema,
+  reserveTableSchema,
+  scheduleVisitSchema,
 } from "@/lib/validation";
 import { TOOL_NAMES } from "@/lib/vapi/tools";
 import type { AgentConfig, Clinic, Database } from "@/types/database";
@@ -257,6 +261,117 @@ async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Pro
   return JSON.stringify({ ordered: true, orderId: order.id, orderNumber: order.order_number, total });
 }
 
+async function handleReserveTable(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = reserveTableSchema.safeParse(rawArgs);
+  if (!parsed.success) {
+    return "Faltan datos para la reserva. Necesito nombre, teléfono, cantidad de personas y la fecha/hora.";
+  }
+  const data = parsed.data;
+  const reservationTime = assumeFutureIntent(parseLocalDateTime(data.reservationTime, ctx.clinic.timezone), new Date());
+
+  const { data: reservation, error } = await ctx.admin
+    .from("table_reservations")
+    .insert({
+      clinic_id: ctx.clinic.id,
+      call_id: ctx.callRowId,
+      customer_name: data.customerName,
+      customer_phone: data.customerPhone,
+      party_size: data.partySize,
+      reservation_time: reservationTime.toISOString(),
+      notes: data.notes ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !reservation) {
+    console.error("Error al guardar la reserva de mesa:", error);
+    return "No pude registrar la reserva, intentemos de nuevo en un momento.";
+  }
+
+  return JSON.stringify({ reserved: true, local: formatLocal(reservationTime, ctx.clinic.timezone) });
+}
+
+async function handleGetProperties(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = getPropertiesSchema.safeParse(rawArgs);
+  const maxPrice = parsed.success ? parsed.data.maxPrice : undefined;
+
+  let query = ctx.admin
+    .from("properties")
+    .select("id, title, address, price, description")
+    .eq("clinic_id", ctx.clinic.id)
+    .eq("status", "disponible")
+    .order("price", { ascending: true })
+    .limit(15);
+  if (maxPrice) query = query.lte("price", maxPrice);
+
+  const { data } = await query;
+  return JSON.stringify(data ?? []);
+}
+
+async function handleScheduleVisit(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = scheduleVisitSchema.safeParse(rawArgs);
+  if (!parsed.success) {
+    return "Faltan datos para agendar la visita. Necesito la propiedad, fecha/hora, nombre y teléfono.";
+  }
+  const data = parsed.data;
+
+  const { data: property } = await ctx.admin
+    .from("properties")
+    .select("id")
+    .eq("id", data.propertyId)
+    .eq("clinic_id", ctx.clinic.id)
+    .maybeSingle();
+  if (!property) {
+    return "No encontré esa propiedad. ¿Podés confirmar cuál te interesa? Puedo volver a consultar el listado.";
+  }
+
+  const visitTime = assumeFutureIntent(parseLocalDateTime(data.visitTime, ctx.clinic.timezone), new Date());
+
+  const { data: visit, error } = await ctx.admin
+    .from("property_visits")
+    .insert({
+      clinic_id: ctx.clinic.id,
+      property_id: data.propertyId,
+      call_id: ctx.callRowId,
+      customer_name: data.customerName,
+      customer_phone: data.customerPhone,
+      visit_time: visitTime.toISOString(),
+      notes: data.notes ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !visit) {
+    console.error("Error al guardar la visita:", error);
+    return "No pude registrar la visita, intentemos de nuevo en un momento.";
+  }
+
+  return JSON.stringify({ scheduled: true, local: formatLocal(visitTime, ctx.clinic.timezone) });
+}
+
+async function handleLogInquiry(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = logInquirySchema.safeParse(rawArgs);
+  if (!parsed.success) {
+    return "Necesito al menos el teléfono del cliente y un resumen de qué necesita para anotarlo.";
+  }
+  const data = parsed.data;
+
+  const { error } = await ctx.admin.from("inquiries").insert({
+    clinic_id: ctx.clinic.id,
+    call_id: ctx.callRowId,
+    customer_name: data.customerName ?? null,
+    customer_phone: data.customerPhone,
+    reason: data.reason,
+  });
+
+  if (error) {
+    console.error("Error al guardar la consulta:", error);
+    return "No pude anotar la consulta, pero seguí adelante igual.";
+  }
+
+  return "Consulta anotada.";
+}
+
 function handleGetClinicInfo(ctx: ToolHandlerContext): string {
   const info = ctx.config.clinic_info;
   return JSON.stringify({
@@ -294,6 +409,14 @@ export async function dispatchToolCall(ctx: ToolHandlerContext, name: string, ra
       return handleGetMenu(ctx);
     case TOOL_NAMES.createOrder:
       return handleCreateOrder(ctx, rawArgs);
+    case TOOL_NAMES.reserveTable:
+      return handleReserveTable(ctx, rawArgs);
+    case TOOL_NAMES.getProperties:
+      return handleGetProperties(ctx, rawArgs);
+    case TOOL_NAMES.scheduleVisit:
+      return handleScheduleVisit(ctx, rawArgs);
+    case TOOL_NAMES.logInquiry:
+      return handleLogInquiry(ctx, rawArgs);
     default:
       return `Tool no reconocida: ${name}`;
   }

@@ -5,6 +5,7 @@ import {
   CookingPotIcon,
   ForkKnifeIcon,
   PhoneIcon,
+  PhoneCallIcon,
   TrendUpIcon,
   WarningCircleIcon,
   WhatsappLogoIcon,
@@ -12,6 +13,7 @@ import {
 import type { Metadata } from "next";
 
 import { CallsChart } from "@/components/dashboard/CallsChart";
+import { InquiriesList } from "@/components/dashboard/InquiriesList";
 import { IntegrationStatus } from "@/components/dashboard/IntegrationStatus";
 import { RecentCalls } from "@/components/dashboard/RecentCalls";
 import { Card } from "@/components/ui/Card";
@@ -34,13 +36,23 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile icon={PhoneIcon} label="Llamadas hoy" value={String(data.callsToday)} />
-        {data.businessType === "pedidos" ? (
+        {data.businessType === "pedidos" || data.businessType === "restaurante" ? (
           <>
             <StatTile icon={ForkKnifeIcon} label="Pedidos hoy" value={String(data.ordersToday)} />
             <StatTile icon={CookingPotIcon} label="En preparación" value={String(data.ordersInPreparation)} />
             <StatTile icon={TrendUpIcon} label="Listos para entregar" value={String(data.ordersReady)} />
           </>
-        ) : (
+        ) : data.businessType === "llamadas" ? (
+          <>
+            <StatTile icon={PhoneCallIcon} label="Consultas hoy" value={String(data.inquiriesToday)} />
+            <StatTile icon={WarningCircleIcon} label="Sin contactar" value={String(data.inquiriesPending)} />
+            <StatTile
+              icon={ClockIcon}
+              label="Duración promedio"
+              value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
+            />
+          </>
+        ) : data.businessType === "citas" ? (
           <>
             <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.appointmentsScheduled)} />
             <StatTile
@@ -54,8 +66,23 @@ export default async function DashboardPage() {
               value={data.bookingRatePct !== null ? `${data.bookingRatePct}%` : "—"}
             />
           </>
+        ) : (
+          <StatTile
+            icon={ClockIcon}
+            label="Duración promedio"
+            value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
+          />
         )}
       </div>
+
+      {data.businessType === "llamadas" && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold">Consultas</h2>
+          <Card>
+            <InquiriesList inquiries={data.recentInquiries} />
+          </Card>
+        </div>
+      )}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold">WhatsApp</h2>

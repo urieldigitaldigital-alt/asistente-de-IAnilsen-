@@ -32,6 +32,7 @@ export async function signup(_prevState: AuthFormState, formData: FormData): Pro
   const clinicName = String(formData.get("clinic_name") ?? "").trim();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim();
+  const businessType = String(formData.get("business_type") ?? "").trim();
 
   if (!email || !password || !clinicName) {
     return { error: "Completa correo, contraseña y el nombre de la clínica." };
@@ -45,7 +46,7 @@ export async function signup(_prevState: AuthFormState, formData: FormData): Pro
     email,
     password,
     options: {
-      data: { clinic_name: clinicName, full_name: fullName || null, timezone: timezone || null },
+      data: { clinic_name: clinicName, full_name: fullName || null, timezone: timezone || null, business_type: businessType || null },
     },
   });
 

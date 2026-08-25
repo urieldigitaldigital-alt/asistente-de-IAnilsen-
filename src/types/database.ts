@@ -3,9 +3,12 @@ export type ProfileRole = "owner" | "staff";
 export type TranscriptRole = "assistant" | "user";
 export type WhatsappConversationStatus = "active" | "needs_follow_up" | "resolved";
 export type WhatsappMessageRole = "customer" | "assistant";
-export type BusinessType = "citas" | "pedidos";
+export type BusinessType = "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
 export type OrderType = "pickup" | "delivery";
 export type OrderStatus = "recibido" | "en_preparacion" | "listo" | "entregado" | "cancelado";
+export type ReservationStatus = "pendiente" | "asignada" | "cancelada";
+export type PropertyStatus = "disponible" | "reservada" | "vendida";
+export type VisitStatus = "pendiente" | "confirmada" | "cancelada";
 
 export interface DayHours {
   start: string; // "09:00"
@@ -286,6 +289,112 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
         Relationships: [];
       };
+      restaurant_tables: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          table_number: number;
+          seats: number;
+          pos_x: number;
+          pos_y: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["restaurant_tables"]["Row"]> & {
+          clinic_id: string;
+          table_number: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["restaurant_tables"]["Row"]>;
+        Relationships: [];
+      };
+      table_reservations: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          call_id: string | null;
+          table_id: string | null;
+          customer_name: string;
+          customer_phone: string;
+          party_size: number;
+          reservation_time: string;
+          status: ReservationStatus;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["table_reservations"]["Row"]> & {
+          clinic_id: string;
+          customer_name: string;
+          customer_phone: string;
+          party_size: number;
+          reservation_time: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["table_reservations"]["Row"]>;
+        Relationships: [];
+      };
+      properties: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          title: string;
+          address: string;
+          price: number;
+          description: string | null;
+          photo_url: string | null;
+          status: PropertyStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["properties"]["Row"]> & {
+          clinic_id: string;
+          title: string;
+          address: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["properties"]["Row"]>;
+        Relationships: [];
+      };
+      property_visits: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          property_id: string;
+          call_id: string | null;
+          customer_name: string;
+          customer_phone: string;
+          visit_time: string;
+          status: VisitStatus;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["property_visits"]["Row"]> & {
+          clinic_id: string;
+          property_id: string;
+          customer_name: string;
+          customer_phone: string;
+          visit_time: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["property_visits"]["Row"]>;
+        Relationships: [];
+      };
+      inquiries: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          call_id: string | null;
+          customer_name: string | null;
+          customer_phone: string;
+          reason: string;
+          contacted: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["inquiries"]["Row"]> & {
+          clinic_id: string;
+          customer_phone: string;
+          reason: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["inquiries"]["Row"]>;
+        Relationships: [];
+      };
       transcripts: {
         Row: {
           id: string;
@@ -326,4 +435,9 @@ export type WhatsappMessage = Database["public"]["Tables"]["whatsapp_messages"][
 export type Call = Database["public"]["Tables"]["calls"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type RestaurantTable = Database["public"]["Tables"]["restaurant_tables"]["Row"];
+export type TableReservation = Database["public"]["Tables"]["table_reservations"]["Row"];
+export type Property = Database["public"]["Tables"]["properties"]["Row"];
+export type PropertyVisit = Database["public"]["Tables"]["property_visits"]["Row"];
+export type Inquiry = Database["public"]["Tables"]["inquiries"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];
