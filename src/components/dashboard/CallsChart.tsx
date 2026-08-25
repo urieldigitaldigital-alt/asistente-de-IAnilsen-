@@ -4,8 +4,8 @@ const WIDTH = 600;
 const HEIGHT = 180;
 const PADDING = 24;
 
-export function CallsChart({ data }: { data: DashboardChartPoint[] }) {
-  const max = Math.max(1, ...data.map((d) => Math.max(d.calls, d.appointments)));
+export function CallsChart({ data, secondaryLabel = "Citas agendadas" }: { data: DashboardChartPoint[]; secondaryLabel?: string }) {
+  const max = Math.max(1, ...data.map((d) => Math.max(d.calls, d.secondary)));
   const groupWidth = (WIDTH - PADDING * 2) / data.length;
   const barWidth = groupWidth / 3;
   const chartHeight = HEIGHT - PADDING * 2;
@@ -15,7 +15,7 @@ export function CallsChart({ data }: { data: DashboardChartPoint[] }) {
 
   return (
     <div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Llamadas y citas en los últimos 7 días">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label={`Llamadas y ${secondaryLabel.toLowerCase()} en los últimos 7 días`}>
         {data.map((point, i) => {
           const groupX = PADDING + i * groupWidth;
           return (
@@ -30,9 +30,9 @@ export function CallsChart({ data }: { data: DashboardChartPoint[] }) {
               />
               <rect
                 x={groupX + barWidth * 1.4}
-                y={barY(point.appointments)}
+                y={barY(point.secondary)}
                 width={barWidth}
-                height={barHeight(point.appointments)}
+                height={barHeight(point.secondary)}
                 rx={2}
                 className="fill-primary"
               />
@@ -53,7 +53,7 @@ export function CallsChart({ data }: { data: DashboardChartPoint[] }) {
           <span className="h-2 w-2 rounded-full bg-primary/70" /> Llamadas
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-primary" /> Citas agendadas
+          <span className="h-2 w-2 rounded-full bg-primary" /> {secondaryLabel}
         </span>
       </div>
     </div>

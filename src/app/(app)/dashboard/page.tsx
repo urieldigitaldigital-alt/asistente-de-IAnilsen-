@@ -96,7 +96,18 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <h2 className="mb-4 text-sm font-semibold">Últimos 7 días</h2>
-          <CallsChart data={data.chart} />
+          <CallsChart
+            data={data.chart}
+            secondaryLabel={
+              data.businessType === "pedidos" || data.businessType === "restaurante"
+                ? "Pedidos"
+                : data.businessType === "inmobiliaria"
+                  ? "Visitas"
+                  : data.businessType === "llamadas"
+                    ? "Consultas"
+                    : "Citas agendadas"
+            }
+          />
         </Card>
         <IntegrationStatus
           googleConnected={data.googleConnected}

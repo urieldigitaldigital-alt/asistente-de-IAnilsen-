@@ -5,7 +5,7 @@ import type { BusinessType, Database } from "@/types/database";
 export interface DashboardChartPoint {
   day: string;
   calls: number;
-  appointments: number;
+  secondary: number;
 }
 
 export interface DashboardRecentCall {
@@ -63,19 +63,47 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   const todayStart = startOfDay(now);
   const weekStart = startOfDay(new Date(now.getTime() - 6 * 24 * 60 * 60_000));
 
+  // El rubro decide qué tabla es la "métrica secundaria" del gráfico semanal
+  // (citas agendadas, pedidos, visitas o consultas) — se necesita antes de
+  // armar esa consulta, así que se resuelve por separado primero.
+  const { data: clinicData } = await supabase.from("clinics").select("business_type").single();
+  const businessType: BusinessType = clinicData?.business_type ?? "citas";
+
+  const weekSecondaryQuery = (() => {
+    switch (businessType) {
+      case "pedidos":
+      case "restaurante":
+        return supabase.from("orders").select("created_at").gte("created_at", weekStart.toISOString()).neq("status", "cancelado");
+      case "inmobiliaria":
+        return supabase
+          .from("property_visits")
+          .select("created_at")
+          .gte("created_at", weekStart.toISOString())
+          .neq("status", "cancelada");
+      case "llamadas":
+        return supabase.from("inquiries").select("created_at").gte("created_at", weekStart.toISOString());
+      case "citas":
+      default:
+        return supabase
+          .from("appointments")
+          .select("created_at")
+          .gte("created_at", weekStart.toISOString())
+          .eq("status", "scheduled");
+    }
+  })();
+
   const [
     callsTodayRes,
     callsWeekRes,
     appointmentsScheduledRes,
     weekCallsRes,
-    weekAppointmentsRes,
+    weekSecondaryRes,
     recentCallsRes,
     configRes,
     googleRes,
     whatsappMessagesTodayRes,
     whatsappActiveRes,
     whatsappFollowUpRes,
-    clinicRes,
     ordersTodayRes,
     ordersInPreparationRes,
     ordersReadyRes,
@@ -87,11 +115,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
     supabase.from("calls").select("created_at, started_at, ended_at").gte("created_at", weekStart.toISOString()),
-    supabase
-      .from("appointments")
-      .select("created_at")
-      .gte("created_at", weekStart.toISOString())
-      .eq("status", "scheduled"),
+    weekSecondaryQuery,
     supabase
       .from("calls")
       .select("id, started_at, created_at, phone_number, status, summary")
@@ -102,7 +126,6 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     supabase.from("whatsapp_messages").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "needs_follow_up"),
-    supabase.from("clinics").select("business_type").single(),
     supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "en_preparacion"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "listo"),
@@ -116,7 +139,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   ]);
 
   const weekCalls = weekCallsRes.data ?? [];
-  const weekAppointments = weekAppointmentsRes.data ?? [];
+  const weekSecondary = (weekSecondaryRes.data as { created_at: string }[] | null) ?? [];
 
   const durations = weekCalls
     .filter((call) => call.started_at && call.ended_at)
@@ -125,22 +148,22 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   const avgDurationMinutes = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
 
   const callsWeekCount = callsWeekRes.count ?? 0;
-  const bookingRatePct = callsWeekCount > 0 ? Math.round((weekAppointments.length / callsWeekCount) * 100) : null;
+  const bookingRatePct = callsWeekCount > 0 ? Math.round((weekSecondary.length / callsWeekCount) * 100) : null;
 
-  const buckets = new Map<string, { calls: number; appointments: number }>();
+  const buckets = new Map<string, { calls: number; secondary: number }>();
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart.getTime() + i * 24 * 60 * 60_000);
-    buckets.set(dayKey(day), { calls: 0, appointments: 0 });
+    buckets.set(dayKey(day), { calls: 0, secondary: 0 });
   }
   for (const call of weekCalls) {
     const key = dayKey(new Date(call.created_at));
     const bucket = buckets.get(key);
     if (bucket) bucket.calls += 1;
   }
-  for (const appointment of weekAppointments) {
-    const key = dayKey(new Date(appointment.created_at));
+  for (const item of weekSecondary) {
+    const key = dayKey(new Date(item.created_at));
     const bucket = buckets.get(key);
-    if (bucket) bucket.appointments += 1;
+    if (bucket) bucket.secondary += 1;
   }
 
   const chart: DashboardChartPoint[] = Array.from(buckets.entries()).map(([key, value]) => ({
@@ -157,7 +180,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   }));
 
   return {
-    businessType: clinicRes.data?.business_type ?? "citas",
+    businessType,
     callsToday: callsTodayRes.count ?? 0,
     callsWeek: callsWeekCount,
     appointmentsScheduled: appointmentsScheduledRes.count ?? 0,

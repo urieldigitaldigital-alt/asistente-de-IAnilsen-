@@ -15,16 +15,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // proxy.ts ya protege estas rutas; esta verificación es defensa en profundidad.
   if (!user) redirect("/login");
 
-  const { data: clinic } = await supabase.from("clinics").select("name, business_type").single();
+  const { data: clinic } = await supabase.from("clinics").select("id, name, business_type").single();
   const businessType = clinic?.business_type ?? "citas";
+
+  let pendingReservations = 0;
+  if (clinic && businessType === "restaurante") {
+    const { count } = await supabase
+      .from("table_reservations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendiente");
+    pendingReservations = count ?? 0;
+  }
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar clinicName={clinic?.name ?? "Mi negocio"} businessType={businessType} />
+      <Sidebar
+        clinicId={clinic?.id ?? null}
+        clinicName={clinic?.name ?? "Mi negocio"}
+        businessType={businessType}
+        initialPendingReservations={pendingReservations}
+      />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar userLabel={user.email ?? ""} />
         <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
-        <MobileNav businessType={businessType} />
+        <MobileNav clinicId={clinic?.id ?? null} businessType={businessType} initialPendingReservations={pendingReservations} />
       </div>
     </div>
   );
