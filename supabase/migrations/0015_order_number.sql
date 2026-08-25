@@ -16,6 +16,24 @@ alter table public.clinic_order_counters force row level security;
 alter table public.orders
   add column order_number integer not null default 0;
 
+-- Backfill: numera los pedidos que ya existían antes de esta migración
+-- (por orden de llegada), para que el índice único de abajo no choque.
+with numbered as (
+  select id, row_number() over (partition by clinic_id order by created_at) as rn
+  from public.orders
+)
+update public.orders o
+set order_number = numbered.rn
+from numbered
+where o.id = numbered.id;
+
+-- Deja el contador de cada clínica listo para el próximo pedido nuevo.
+insert into public.clinic_order_counters (clinic_id, next_number)
+select clinic_id, max(order_number) + 1
+from public.orders
+group by clinic_id
+on conflict (clinic_id) do update set next_number = excluded.next_number;
+
 create unique index orders_clinic_id_order_number_key on public.orders (clinic_id, order_number);
 
 create function public.assign_order_number()
