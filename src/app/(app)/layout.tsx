@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { redirect } from "next/navigation";
 
-import { MobileNav, Sidebar } from "@/components/layout/Sidebar";
+import { MobileNav, PendingReservationsProvider, Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,18 +28,19 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar
-        clinicId={clinic?.id ?? null}
-        clinicName={clinic?.name ?? "Mi negocio"}
-        businessType={businessType}
-        initialPendingReservations={pendingReservations}
-      />
-      <div className="flex min-h-screen flex-1 flex-col">
-        <Topbar userLabel={user.email ?? ""} />
-        <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
-        <MobileNav clinicId={clinic?.id ?? null} businessType={businessType} initialPendingReservations={pendingReservations} />
+    <PendingReservationsProvider
+      clinicId={clinic?.id ?? null}
+      businessType={businessType}
+      initialPendingReservations={pendingReservations}
+    >
+      <div className="flex min-h-screen">
+        <Sidebar clinicName={clinic?.name ?? "Mi negocio"} businessType={businessType} />
+        <div className="flex min-h-screen flex-1 flex-col">
+          <Topbar userLabel={user.email ?? ""} />
+          <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
+          <MobileNav businessType={businessType} />
+        </div>
       </div>
-    </div>
+    </PendingReservationsProvider>
   );
 }

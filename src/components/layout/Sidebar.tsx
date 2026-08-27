@@ -14,7 +14,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import type { BusinessType } from "@/types/database";
@@ -51,7 +51,15 @@ function getNavItems(businessType: BusinessType) {
   ];
 }
 
-/** Reservas de mesa sin asignar (necesitan que alguien las asigne a mano) — se actualiza en vivo. */
+/**
+ * Reservas de mesa sin asignar (necesitan que alguien las asigne a mano) — se
+ * actualiza en vivo. Se calcula una sola vez acá y se comparte por Context
+ * porque el Sidebar de escritorio y el MobileNav están montados los dos al
+ * mismo tiempo (uno se oculta por CSS, no se desmonta): si cada uno abriera
+ * su propia suscripción de Realtime, la segunda choca con la primera al usar
+ * el mismo nombre de canal y tira "cannot add postgres_changes callbacks...
+ * after subscribe()", lo que rompe toda la página.
+ */
 function usePendingReservations(clinicId: string | null, businessType: BusinessType, initial: number): number {
   const [count, setCount] = useState(initial);
   const supabase = useMemo(() => createClient(), []);
@@ -79,6 +87,23 @@ function usePendingReservations(clinicId: string | null, businessType: BusinessT
   }, [supabase, clinicId, businessType]);
 
   return clinicId && businessType === "restaurante" ? count : 0;
+}
+
+const PendingReservationsContext = createContext(0);
+
+export function PendingReservationsProvider({
+  clinicId,
+  businessType,
+  initialPendingReservations,
+  children,
+}: {
+  clinicId: string | null;
+  businessType: BusinessType;
+  initialPendingReservations: number;
+  children: ReactNode;
+}) {
+  const pendingReservations = usePendingReservations(clinicId, businessType, initialPendingReservations);
+  return <PendingReservationsContext.Provider value={pendingReservations}>{children}</PendingReservationsContext.Provider>;
 }
 
 function NavLink({
@@ -123,19 +148,15 @@ function NavLink({
 }
 
 export function Sidebar({
-  clinicId,
   clinicName,
   businessType,
-  initialPendingReservations,
 }: {
-  clinicId: string | null;
   clinicName: string;
   businessType: BusinessType;
-  initialPendingReservations: number;
 }) {
   const pathname = usePathname();
   const NAV_ITEMS = getNavItems(businessType);
-  const pendingReservations = usePendingReservations(clinicId, businessType, initialPendingReservations);
+  const pendingReservations = useContext(PendingReservationsContext);
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
@@ -162,18 +183,10 @@ export function Sidebar({
   );
 }
 
-export function MobileNav({
-  clinicId,
-  businessType,
-  initialPendingReservations,
-}: {
-  clinicId: string | null;
-  businessType: BusinessType;
-  initialPendingReservations: number;
-}) {
+export function MobileNav({ businessType }: { businessType: BusinessType }) {
   const pathname = usePathname();
   const NAV_ITEMS = getNavItems(businessType);
-  const pendingReservations = usePendingReservations(clinicId, businessType, initialPendingReservations);
+  const pendingReservations = useContext(PendingReservationsContext);
 
   return (
     <nav className="flex items-center justify-around border-t border-border bg-surface py-1.5 md:hidden">
