@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
 
     const reply = await sendChatMessage({
       vapi,
-      assistantId: config.vapi_assistant_id,
       sessionId: conversation.vapiSessionId,
       input: inbound.body,
     });

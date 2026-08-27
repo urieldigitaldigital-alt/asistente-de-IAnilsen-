@@ -62,15 +62,15 @@ function extractAssistantText(output: Vapi.ChatOutputItem[] | undefined): string
   return null;
 }
 
-/** Manda el mensaje entrante del cliente al assistant (vía Chat API) y devuelve la respuesta en texto. */
-export async function sendChatMessage(params: {
-  vapi: VapiClient;
-  assistantId: string;
-  sessionId: string;
-  input: string;
-}): Promise<string | null> {
-  const { vapi, assistantId, sessionId, input } = params;
-  const chat = await vapi.chats.create({ assistantId, sessionId, input });
+/**
+ * Manda el mensaje entrante del cliente al assistant (vía Chat API) y
+ * devuelve la respuesta en texto. Solo `sessionId` — VAPI rechaza (400) que
+ * se mande junto con `assistantId`, ya que la sesión ya quedó vinculada al
+ * assistant desde que se creó en `getOrCreateWhatsappSession`.
+ */
+export async function sendChatMessage(params: { vapi: VapiClient; sessionId: string; input: string }): Promise<string | null> {
+  const { vapi, sessionId, input } = params;
+  const chat = await vapi.chats.create({ sessionId, input });
   if ("output" in chat) {
     return extractAssistantText(chat.output);
   }
