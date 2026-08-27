@@ -18,28 +18,73 @@ export interface DecryptedWhatsappCredentials {
   metaVerifyToken: string;
 }
 
-/** Guarda (o reemplaza) las credenciales de WhatsApp (Meta Cloud API) del negocio del usuario autenticado. */
+/**
+ * Guarda (o actualiza) las credenciales de WhatsApp (Meta Cloud API) del
+ * negocio del usuario autenticado. El Access Token nunca se precarga en el
+ * formulario (es secreto) — si llega vacío, se interpreta como "no cambiar"
+ * y se conserva el que ya estaba guardado.
+ */
 export async function saveWhatsappCredentials(input: WhatsappCredentialsInput): Promise<void> {
   const supabase = await createClient();
   const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
   if (clinicError || !clinic) throw new Error("No se encontró el negocio del usuario.");
 
-  const { error } = await supabase.from("whatsapp_credentials").upsert(
-    {
-      clinic_id: clinic.id,
-      whatsapp_number: input.whatsappNumber,
-      meta_phone_number_id: input.metaPhoneNumberId,
-      meta_access_token_encrypted: encrypt(input.metaAccessToken),
-      meta_verify_token: encrypt(input.metaVerifyToken),
-    },
-    { onConflict: "clinic_id" }
-  );
+  const record: {
+    clinic_id: string;
+    whatsapp_number: string;
+    meta_phone_number_id: string;
+    meta_verify_token: string;
+    meta_access_token_encrypted?: string;
+  } = {
+    clinic_id: clinic.id,
+    whatsapp_number: input.whatsappNumber,
+    meta_phone_number_id: input.metaPhoneNumberId,
+    meta_verify_token: encrypt(input.metaVerifyToken),
+  };
+
+  if (input.metaAccessToken) {
+    record.meta_access_token_encrypted = encrypt(input.metaAccessToken);
+  } else {
+    const alreadyConnected = await hasWhatsappCredentials(clinic.id, supabase);
+    if (!alreadyConnected) throw new Error("Falta el Access Token de Meta.");
+  }
+
+  // El tipo generado exige meta_access_token_encrypted (columna not null), pero acá se omite
+  // a propósito cuando ya existe una fila: PostgREST solo actualiza las columnas presentes en
+  // el payload, así que el token guardado queda intacto en ese caso.
+  const { error } = await supabase
+    .from("whatsapp_credentials")
+    .upsert(record as Database["public"]["Tables"]["whatsapp_credentials"]["Insert"], { onConflict: "clinic_id" });
   if (error) throw error;
 }
 
 export async function hasWhatsappCredentials(clinicId: string, supabase: SupabaseClient<Database>): Promise<boolean> {
   const { data } = await supabase.from("whatsapp_credentials").select("clinic_id").eq("clinic_id", clinicId).maybeSingle();
   return Boolean(data);
+}
+
+export interface WhatsappCredentialsSummary {
+  whatsappNumber: string;
+  metaPhoneNumberId: string;
+  metaVerifyToken: string;
+}
+
+/** Datos ya guardados, no secretos, para precargar el formulario de Integraciones (el Access Token nunca se muestra). */
+export async function getWhatsappCredentialsSummary(
+  clinicId: string,
+  supabase: SupabaseClient<Database>
+): Promise<WhatsappCredentialsSummary | null> {
+  const { data } = await supabase
+    .from("whatsapp_credentials")
+    .select("whatsapp_number, meta_phone_number_id, meta_verify_token")
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    whatsappNumber: data.whatsapp_number,
+    metaPhoneNumberId: data.meta_phone_number_id,
+    metaVerifyToken: decrypt(data.meta_verify_token),
+  };
 }
 
 /** Credenciales descifradas, buscadas por el Phone Number ID de Meta que recibió el mensaje (uso: webhook, cliente admin). */

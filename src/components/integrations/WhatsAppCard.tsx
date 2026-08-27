@@ -10,7 +10,15 @@ import { Input, Label } from "@/components/ui/Input";
 
 const idleState: WhatsappActionState = { error: null, success: null };
 
-export function WhatsAppCard({ connected, assistantId }: { connected: boolean; assistantId: string | null }) {
+export function WhatsAppCard({
+  connected,
+  assistantId,
+  initialValues,
+}: {
+  connected: boolean;
+  assistantId: string | null;
+  initialValues: { whatsappNumber: string; metaPhoneNumberId: string; metaVerifyToken: string } | null;
+}) {
   const [state, formAction, pending] = useActionState(saveWhatsappCredentialsAction, idleState);
 
   return (
@@ -46,19 +54,37 @@ export function WhatsAppCard({ connected, assistantId }: { connected: boolean; a
       <form action={formAction} className="space-y-2">
         <div>
           <Label htmlFor="whatsappNumber">Número de WhatsApp (el que te dio Meta)</Label>
-          <Input id="whatsappNumber" name="whatsappNumber" placeholder="+15551234567" required />
+          <Input id="whatsappNumber" name="whatsappNumber" placeholder="+15551234567" defaultValue={initialValues?.whatsappNumber} required />
         </div>
         <div>
           <Label htmlFor="metaPhoneNumberId">Phone Number ID (de Meta)</Label>
-          <Input id="metaPhoneNumberId" name="metaPhoneNumberId" placeholder="123456789012345" required />
+          <Input
+            id="metaPhoneNumberId"
+            name="metaPhoneNumberId"
+            placeholder="123456789012345"
+            defaultValue={initialValues?.metaPhoneNumberId}
+            required
+          />
         </div>
         <div>
-          <Label htmlFor="metaAccessToken">Access Token (de Meta)</Label>
-          <Input id="metaAccessToken" name="metaAccessToken" type="password" autoComplete="off" required />
+          <Label htmlFor="metaAccessToken">
+            Access Token (de Meta){connected ? " — dejalo en blanco si no cambió" : ""}
+          </Label>
+          <Input id="metaAccessToken" name="metaAccessToken" type="password" autoComplete="off" required={!connected} />
+          {connected && (
+            <p className="mt-1 text-xs text-muted">Por seguridad no mostramos el token guardado — completalo solo si lo renovaste.</p>
+          )}
         </div>
         <div>
           <Label htmlFor="metaVerifyToken">Verify Token (inventá uno, ej. &quot;asistente2026&quot;)</Label>
-          <Input id="metaVerifyToken" name="metaVerifyToken" autoComplete="off" placeholder="asistente2026" required />
+          <Input
+            id="metaVerifyToken"
+            name="metaVerifyToken"
+            autoComplete="off"
+            placeholder="asistente2026"
+            defaultValue={initialValues?.metaVerifyToken}
+            required
+          />
           <p className="mt-1 text-xs text-muted">
             Este valor lo elegís vos — usá el mismo texto acá y en el webhook de Meta.
           </p>

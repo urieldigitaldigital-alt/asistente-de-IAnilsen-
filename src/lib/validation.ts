@@ -184,7 +184,8 @@ export const twilioImportFormSchema = z.object({
 export const whatsappCredentialsFormSchema = z.object({
   whatsappNumber: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
   metaPhoneNumberId: z.string().min(5, "Phone Number ID de Meta inválido."),
-  metaAccessToken: z.string().min(20, "Access Token de Meta inválido."),
+  // Vacío = "no cambiar" al actualizar (ver saveWhatsappCredentials); solo se exige largo mínimo si viene algo.
+  metaAccessToken: z.string().refine((v) => v === "" || v.length >= 20, "Access Token de Meta inválido."),
   metaVerifyToken: z.string().min(4, "Elegí un Verify Token de al menos 4 caracteres."),
 });
 

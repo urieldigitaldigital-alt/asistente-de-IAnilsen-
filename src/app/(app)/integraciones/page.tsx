@@ -8,7 +8,7 @@ import { WhatsAppCard } from "@/components/integrations/WhatsAppCard";
 import { createClient } from "@/lib/supabase/server";
 import { hasVapiCredentials } from "@/lib/vapi/credentials";
 import { getPhoneNumberDigits } from "@/lib/vapi/sync";
-import { hasWhatsappCredentials } from "@/lib/whatsapp/credentials";
+import { getWhatsappCredentialsSummary } from "@/lib/whatsapp/credentials";
 
 export const metadata: Metadata = { title: "Integraciones — Asistente Nilsen IA" };
 
@@ -23,11 +23,11 @@ export default async function IntegrationsPage({
   const { data: clinic } = await supabase.from("clinics").select("id").single();
   if (!clinic) return null;
 
-  const [{ data: config }, { data: googleCred }, vapiConnected, whatsappConnected] = await Promise.all([
+  const [{ data: config }, { data: googleCred }, vapiConnected, whatsappSummary] = await Promise.all([
     supabase.from("agent_configs").select("vapi_assistant_id, vapi_phone_number_id").eq("clinic_id", clinic.id).single(),
     supabase.from("google_credentials").select("clinic_id").eq("clinic_id", clinic.id).maybeSingle(),
     hasVapiCredentials(clinic.id, supabase),
-    hasWhatsappCredentials(clinic.id, supabase),
+    getWhatsappCredentialsSummary(clinic.id, supabase),
   ]);
 
   const phoneNumber =
@@ -53,7 +53,11 @@ export default async function IntegrationsPage({
           phoneNumber={phoneNumber}
           vapiConnected={vapiConnected}
         />
-        <WhatsAppCard connected={whatsappConnected} assistantId={config?.vapi_assistant_id ?? null} />
+        <WhatsAppCard
+          connected={Boolean(whatsappSummary)}
+          assistantId={config?.vapi_assistant_id ?? null}
+          initialValues={whatsappSummary}
+        />
       </div>
     </div>
   );
