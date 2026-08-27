@@ -177,8 +177,13 @@ function flowForType(businessType: Clinic["business_type"]): string {
  * Compone el system prompt final: el texto editable por el dueño en
  * Personalización (identidad, tono, guardrails) + un contexto estructurado
  * generado a partir de los datos del negocio, siempre sincronizado.
+ *
+ * `greeting`, si se pasa, agrega la instrucción de apertura de llamada (el
+ * asistente espera a que el cliente hable primero y responde con ese saludo
+ * exacto). Solo aplica a llamadas de voz — se omite en WhatsApp, donde el
+ * cliente ya escribió el primer mensaje y el modelo debe responder de una.
  */
-export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
+export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, greeting?: string): string {
   const context = contextSection(clinic, config);
 
   const sections: (string | null)[] = [
@@ -186,6 +191,12 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
     "",
     `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Usa siempre este año real al calcular cualquier fecha para las tools — nunca un año de otra época.`,
     "",
+    greeting ? "## Cómo empezar la llamada" : null,
+    greeting
+      ? `Todavía no dijiste nada: esperá en silencio a que el cliente hable primero (por ejemplo "hola" o "buenas"). Apenas diga algo, tu primera respuesta tiene que ser este saludo, palabra por palabra: "${greeting}"`
+      : null,
+    greeting ? "Después de ese saludo, seguí normalmente con el flujo de la llamada descrito más abajo." : null,
+    greeting ? "" : null,
     "## Contexto del negocio",
     `Nombre: ${clinic.name}`,
     clinic.address ? `Dirección: ${clinic.address}` : null,

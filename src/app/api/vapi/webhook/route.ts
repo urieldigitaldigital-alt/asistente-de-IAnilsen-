@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const firstMessage = await buildPersonalizedFirstMessage(admin, clinic, config, message.call?.customer?.number);
-      const assistant = buildAssistantPayload(clinic, config, firstMessage);
+      const greeting = await buildPersonalizedFirstMessage(admin, clinic, config, message.call?.customer?.number);
+      const assistant = buildAssistantPayload(clinic, config, greeting);
       return NextResponse.json({ assistant });
     } catch (err) {
       console.error("Error armando el assistant dinámico:", err);

@@ -89,19 +89,25 @@ export interface SyncAssistantResult {
 /**
  * Compone el payload completo de un assistant de VAPI a partir de
  * clinic/agent_configs. Se usa tanto para publicar el assistant persistido
- * (botón "Publicar") como, con un firstMessage distinto, en la respuesta al
- * evento `assistant-request` (saludo personalizado por llamada).
+ * (botón "Publicar") como, con un saludo distinto, en la respuesta al evento
+ * `assistant-request` (saludo personalizado por llamada).
+ *
+ * El asistente no habla primero: espera a que el cliente diga algo (evita
+ * "pisar" al que llama) y el saludo se le pasa al modelo como instrucción de
+ * apertura dentro del system prompt en vez de como `firstMessage` fijo — VAPI
+ * no reproduce `firstMessage` cuando `firstMessageMode` es
+ * "assistant-waits-for-user".
  */
-export function buildAssistantPayload(clinic: Clinic, config: AgentConfig, firstMessage: string) {
+export function buildAssistantPayload(clinic: Clinic, config: AgentConfig, greeting: string) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
 
-  const systemPrompt = buildSystemPrompt(clinic, config);
+  const systemPrompt = buildSystemPrompt(clinic, config, greeting);
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
   return {
     name: clinic.name.slice(0, 40),
-    firstMessage,
+    firstMessageMode: "assistant-waits-for-user" as Vapi.CreateAssistantDtoFirstMessageMode,
     model: buildModel(config.model, tools, systemPrompt),
     voice: buildVoice(config.voice),
     transcriber: buildTranscriber(config.language),
@@ -146,8 +152,8 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
     .single();
   if (configError || !config) throw new Error("No se encontró la configuración del agente.");
 
-  const firstMessage = buildFirstMessage(config, clinic);
-  const payload = buildAssistantPayload(clinic, config, firstMessage);
+  const greeting = buildFirstMessage(config, clinic);
+  const payload = buildAssistantPayload(clinic, config, greeting);
 
   const vapi = await getTenantVapiClient(clinic.id, supabase);
 
