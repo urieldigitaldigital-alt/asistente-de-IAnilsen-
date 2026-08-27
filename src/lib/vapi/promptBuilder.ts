@@ -99,6 +99,7 @@ const SHARED_FLOW_CLOSING = [
   "- En cuanto el cliente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despídete brevemente en una sola frase y de inmediato llama a la tool endCall para colgar la llamada. No sigas hablando después de despedirte.",
   "- Sé conciso en cada turno: frases cortas, sin relleno ni repetir información que el cliente ya confirmó. El objetivo es una llamada breve y directa, no una lectura formal.",
   "- Di siempre los números en español, nunca en inglés. Los teléfonos léelos dígito por dígito en español (ej. \"cuatro, uno, cero, uno...\"), nunca como un número completo. Las horas dilas en palabras (\"a las tres de la tarde\"), nunca como \"3:00 PM\" ni en inglés.",
+  "- Al pedir el número de teléfono del cliente, nunca te quedes con unos pocos dígitos (por ejemplo, solo el código de área) — seguí preguntando \"¿y los números que siguen?\" hasta tener el número completo (normalmente 10 dígitos en total) antes de repetirlo de vuelta, confirmarlo o llamar a cualquier tool que lo necesite.",
 ].join("\n");
 
 function identityDefault(clinic: Clinic): string {

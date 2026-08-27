@@ -81,7 +81,7 @@ export async function buildPersonalizedFirstMessage(
       clinic.business_type === "pedidos" || clinic.business_type === "restaurante"
         ? "¿Qué te gustaría pedir hoy?"
         : "¿En qué te puedo ayudar hoy?";
-    return `¡Hola ${firstName}! Qué bueno tenerte de vuelta en ${clinic.name}. ${help}`;
+    return `¡Hola ${firstName}! Gracias por volver a llamar a ${clinic.name}. ${help}`;
   } catch (err) {
     console.error("Error buscando cliente recurrente:", err);
     return fallback;

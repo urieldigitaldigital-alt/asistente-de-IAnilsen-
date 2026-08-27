@@ -18,11 +18,21 @@ export const checkAvailabilitySchema = z.object({
   daysAhead: z.number().int().min(1).max(30).optional(),
 });
 
+// El modelo a veces corta la captura del teléfono a mitad de camino (ej. solo
+// el código de área). Exigir un mínimo de dígitos evita guardar un número a
+// medias — el mensaje le indica al modelo que le pida el resto al cliente.
+const phoneSchema = z
+  .string()
+  .min(1)
+  .refine((value) => value.replace(/\D/g, "").length >= 8, {
+    message: "El teléfono parece incompleto. Pedile al cliente que te repita el número completo, dígito por dígito.",
+  });
+
 export const bookAppointmentSchema = z.object({
   datetime: flexibleDatetime,
   durationMinutes: z.number().positive(),
   patientName: z.string().min(1),
-  patientPhone: z.string().min(1),
+  patientPhone: phoneSchema,
   patientEmail: z.string().email().optional(),
   treatment: z.string().min(1),
   isNewPatient: z.boolean(),
@@ -32,7 +42,7 @@ export const bookAppointmentSchema = z.object({
 export const cancelAppointmentSchema = z.object({
   eventId: z.string().optional(),
   patientName: z.string().optional(),
-  patientPhone: z.string().optional(),
+  patientPhone: phoneSchema.optional(),
   datetime: flexibleDatetime.optional(),
 });
 
