@@ -1,78 +1,126 @@
+import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Vapi, VapiClient } from "@vapi-ai/server-sdk";
 
-import type { Database } from "@/types/database";
+import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
+import { buildAssistantTools } from "@/lib/vapi/tools";
+import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
+import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/database";
 
-export interface WhatsappConversation {
-  /** id de la fila en whatsapp_sessions (nuestra conversación) — usado para loguear mensajes. */
-  id: string;
-  /** id de la sesión en VAPI — usado para llamar a la Chat API. */
-  vapiSessionId: string;
+const MODEL = "claude-haiku-4-5";
+const MAX_TOOL_TURNS = 6;
+
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY no está configurada.");
+  return new Anthropic({ apiKey });
 }
 
 /**
- * Busca (o crea) la sesión de la Chat API de VAPI para esta conversación de
- * WhatsApp (negocio + número del cliente), para que el asistente recuerde el
- * contexto entre mensajes en vez de arrancar de cero cada vez.
+ * Mismas tools que usan las llamadas (mismo `dispatchToolCall`, misma lógica
+ * de negocio) traducidas al formato de Claude — sin las nativas de VAPI
+ * (endCall/transferCall), que no aplican a una conversación de texto.
  */
+function buildClaudeTools(businessType: BusinessType): Anthropic.Tool[] {
+  return buildAssistantTools({ businessType })
+    .filter((tool) => tool.type === "function" && tool.function)
+    .map((tool) => {
+      const fn = (tool as Extract<typeof tool, { type: "function" }>).function!;
+      return {
+        name: fn.name!,
+        description: fn.description,
+        input_schema: (fn.parameters ?? { type: "object", properties: {} }) as Anthropic.Tool.InputSchema,
+      };
+    });
+}
+
+export interface WhatsappConversation {
+  id: string;
+}
+
+/** Busca (o crea) la conversación de WhatsApp para este negocio + número del cliente. */
 export async function getOrCreateWhatsappSession(params: {
   clinicId: string;
   customerPhone: string;
-  assistantId: string;
-  vapi: VapiClient;
   admin: SupabaseClient<Database>;
 }): Promise<WhatsappConversation> {
-  const { clinicId, customerPhone, assistantId, vapi, admin } = params;
+  const { clinicId, customerPhone, admin } = params;
 
   const { data: existing } = await admin
     .from("whatsapp_sessions")
-    .select("id, vapi_session_id")
+    .select("id")
     .eq("clinic_id", clinicId)
     .eq("customer_phone", customerPhone)
     .maybeSingle();
-  if (existing) return { id: existing.id, vapiSessionId: existing.vapi_session_id };
-
-  const session = await vapi.sessions.create({
-    assistantId,
-    name: `whatsapp-${customerPhone}`.slice(0, 40),
-  });
+  if (existing) return { id: existing.id };
 
   const { data: created, error } = await admin
     .from("whatsapp_sessions")
-    .upsert(
-      { clinic_id: clinicId, customer_phone: customerPhone, vapi_session_id: session.id },
-      { onConflict: "clinic_id,customer_phone" }
-    )
+    .upsert({ clinic_id: clinicId, customer_phone: customerPhone }, { onConflict: "clinic_id,customer_phone" })
     .select("id")
     .single();
   if (error || !created) throw error ?? new Error("No se pudo crear la conversación de WhatsApp.");
 
-  return { id: created.id, vapiSessionId: session.id };
-}
-
-/** Extrae el último mensaje de texto del asistente de la respuesta de la Chat API. */
-function extractAssistantText(output: Vapi.ChatOutputItem[] | undefined): string | null {
-  if (!output) return null;
-  for (let i = output.length - 1; i >= 0; i--) {
-    const item = output[i];
-    if (item.role === "assistant" && "content" in item && item.content) {
-      return item.content;
-    }
-  }
-  return null;
+  return { id: created.id };
 }
 
 /**
- * Manda el mensaje entrante del cliente al assistant (vía Chat API) y
- * devuelve la respuesta en texto. Solo `sessionId` — VAPI rechaza (400) que
- * se mande junto con `assistantId`, ya que la sesión ya quedó vinculada al
- * assistant desde que se creó en `getOrCreateWhatsappSession`.
+ * Manda el mensaje entrante del cliente a Claude (con el mismo prompt y las
+ * mismas herramientas que usan las llamadas, más el historial de la
+ * conversación) y devuelve la respuesta final en texto, ejecutando las
+ * tools que haga falta en el camino.
  */
-export async function sendChatMessage(params: { vapi: VapiClient; sessionId: string; input: string }): Promise<string | null> {
-  const { vapi, sessionId, input } = params;
-  const chat = await vapi.chats.create({ sessionId, input });
-  if ("output" in chat) {
-    return extractAssistantText(chat.output);
+export async function sendChatMessage(params: {
+  admin: SupabaseClient<Database>;
+  clinic: Clinic;
+  config: AgentConfig;
+  sessionId: string;
+  input: string;
+}): Promise<string | null> {
+  const { admin, clinic, config, sessionId, input } = params;
+  const anthropic = getAnthropicClient();
+
+  const { data: history } = await admin
+    .from("whatsapp_messages")
+    .select("role, body")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true })
+    .limit(30);
+
+  const messages: Anthropic.MessageParam[] = (history ?? []).map((m) => ({
+    role: m.role === "customer" ? "user" : "assistant",
+    content: m.body,
+  }));
+  messages.push({ role: "user", content: input });
+
+  const tools = buildClaudeTools(clinic.business_type);
+  const system = buildSystemPrompt(clinic, config);
+  const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null };
+
+  for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system,
+      tools,
+      messages,
+    });
+
+    if (response.stop_reason !== "tool_use") {
+      const textBlock = response.content.find((block) => block.type === "text");
+      return textBlock && textBlock.type === "text" ? textBlock.text : null;
+    }
+
+    messages.push({ role: "assistant", content: response.content });
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    for (const block of response.content) {
+      if (block.type === "tool_use") {
+        const result = await dispatchToolCall(ctx, block.name, block.input);
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      }
+    }
+    messages.push({ role: "user", content: toolResults });
   }
+
   return null;
 }

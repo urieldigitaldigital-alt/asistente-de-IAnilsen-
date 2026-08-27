@@ -182,7 +182,6 @@ export interface Database {
           clinic_id: string;
           customer_phone: string;
           customer_name: string | null;
-          vapi_session_id: string;
           status: WhatsappConversationStatus;
           last_message_at: string;
           updated_at: string;
@@ -191,7 +190,6 @@ export interface Database {
         Insert: Partial<Database["public"]["Tables"]["whatsapp_sessions"]["Row"]> & {
           clinic_id: string;
           customer_phone: string;
-          vapi_session_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_sessions"]["Row"]>;
         Relationships: [];

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTenantVapiClient } from "@/lib/vapi/credentials";
 import { getOrCreateWhatsappSession, sendChatMessage } from "@/lib/whatsapp/chat";
 import { findClinicByVerifyToken, getWhatsappCredentialsByPhoneNumberId } from "@/lib/whatsapp/credentials";
 import { logWhatsappMessage } from "@/lib/whatsapp/messages";
@@ -49,25 +48,20 @@ export async function POST(request: NextRequest) {
       body: text,
     }).catch((err) => console.error("Error enviando WhatsApp de fallback:", err));
 
-  const { data: config } = await admin
-    .from("agent_configs")
-    .select("vapi_assistant_id")
-    .eq("clinic_id", credentials.clinicId)
-    .maybeSingle();
+  const [{ data: clinic }, { data: config }] = await Promise.all([
+    admin.from("clinics").select("*").eq("id", credentials.clinicId).single(),
+    admin.from("agent_configs").select("*").eq("clinic_id", credentials.clinicId).single(),
+  ]);
 
-  if (!config?.vapi_assistant_id) {
-    await sendFallback("Gracias por tu mensaje. El asistente todavía no está activo, en breve te contactamos.");
+  if (!clinic || !config) {
+    await sendFallback("Gracias por tu mensaje. En breve te contactamos.");
     return NextResponse.json({});
   }
 
   try {
-    const vapi = await getTenantVapiClient(credentials.clinicId, admin);
-
     const conversation = await getOrCreateWhatsappSession({
       clinicId: credentials.clinicId,
       customerPhone: inbound.from,
-      assistantId: config.vapi_assistant_id,
-      vapi,
       admin,
     });
 
@@ -79,8 +73,10 @@ export async function POST(request: NextRequest) {
     });
 
     const reply = await sendChatMessage({
-      vapi,
-      sessionId: conversation.vapiSessionId,
+      admin,
+      clinic,
+      config,
+      sessionId: conversation.id,
       input: inbound.body,
     });
     const replyText = reply ?? "Gracias por tu mensaje. En breve te contestamos.";
