@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       clinic,
       config,
       sessionId: conversation.id,
+      customerPhone: inbound.from,
       input: inbound.body,
     });
     const replyText = reply ?? "Gracias por tu mensaje. En breve te contestamos.";

@@ -173,30 +173,44 @@ function flowForType(businessType: Clinic["business_type"]): string {
   }
 }
 
+/** Instrucción de apertura: el saludo configurado en Personalización (mensaje de bienvenida, o el personalizado a un cliente recurrente) llevado al canal correspondiente. */
+export interface OpeningInstruction {
+  channel: "call" | "whatsapp";
+  greeting: string;
+}
+
 /**
  * Compone el system prompt final: el texto editable por el dueño en
  * Personalización (identidad, tono, guardrails) + un contexto estructurado
- * generado a partir de los datos del negocio, siempre sincronizado.
+ * generado a partir de los datos del negocio, siempre sincronizado — la
+ * misma función para llamadas y WhatsApp, así cualquier cambio en
+ * Personalización se refleja en los dos canales.
  *
- * `greeting`, si se pasa, agrega la instrucción de apertura de llamada (el
- * asistente espera a que el cliente hable primero y responde con ese saludo
- * exacto). Solo aplica a llamadas de voz — se omite en WhatsApp, donde el
- * cliente ya escribió el primer mensaje y el modelo debe responder de una.
+ * `opening`, si se pasa, agrega la instrucción de saludo inicial: en
+ * llamadas, el asistente espera a que el cliente hable primero y responde
+ * con ese saludo; en WhatsApp, el cliente ya escribió (es su primer mensaje
+ * de la conversación) así que el asistente abre su respuesta con el saludo
+ * y sigue respondiendo lo que haya preguntado.
  */
-export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, greeting?: string): string {
+export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?: OpeningInstruction): string {
   const context = contextSection(clinic, config);
+
+  const openingHeading = opening ? (opening.channel === "call" ? "## Cómo empezar la llamada" : "## Cómo empezar la conversación") : null;
+  const openingBody =
+    opening?.channel === "call"
+      ? `Todavía no dijiste nada: esperá en silencio a que el cliente hable primero (por ejemplo "hola" o "buenas"). Apenas diga algo, tu primera respuesta tiene que ser este saludo, palabra por palabra: "${opening.greeting}"\nDespués de ese saludo, seguí normalmente con el flujo de la llamada descrito más abajo.`
+      : opening?.channel === "whatsapp"
+        ? `Este es el primer mensaje de esta conversación de WhatsApp con este cliente. Abrí tu respuesta con este saludo, palabra por palabra: "${opening.greeting}"\nDespués seguí respondiendo lo que el cliente haya escrito en su mensaje.`
+        : null;
 
   const sections: (string | null)[] = [
     config.system_prompt.trim() || identityDefault(clinic),
     "",
     `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Usa siempre este año real al calcular cualquier fecha para las tools — nunca un año de otra época.`,
     "",
-    greeting ? "## Cómo empezar la llamada" : null,
-    greeting
-      ? `Todavía no dijiste nada: esperá en silencio a que el cliente hable primero (por ejemplo "hola" o "buenas"). Apenas diga algo, tu primera respuesta tiene que ser este saludo, palabra por palabra: "${greeting}"`
-      : null,
-    greeting ? "Después de ese saludo, seguí normalmente con el flujo de la llamada descrito más abajo." : null,
-    greeting ? "" : null,
+    openingHeading,
+    openingBody,
+    opening ? "" : null,
     "## Contexto del negocio",
     `Nombre: ${clinic.name}`,
     clinic.address ? `Dirección: ${clinic.address}` : null,

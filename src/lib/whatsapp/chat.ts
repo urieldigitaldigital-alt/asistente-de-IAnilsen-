@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
 import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
 import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
@@ -74,9 +75,10 @@ export async function sendChatMessage(params: {
   clinic: Clinic;
   config: AgentConfig;
   sessionId: string;
+  customerPhone: string;
   input: string;
 }): Promise<string | null> {
-  const { admin, clinic, config, sessionId, input } = params;
+  const { admin, clinic, config, sessionId, customerPhone, input } = params;
   const anthropic = getAnthropicClient();
 
   const { data: history } = await admin
@@ -93,7 +95,12 @@ export async function sendChatMessage(params: {
   messages.push({ role: "user", content: input });
 
   const tools = buildClaudeTools(clinic.business_type);
-  const system = buildSystemPrompt(clinic, config);
+  // Primer mensaje de la conversación (sin historial previo): usa el mismo
+  // saludo de bienvenida/personalizado a cliente recurrente que las llamadas,
+  // configurado en Personalización.
+  const isFirstMessage = !history || history.length === 0;
+  const greeting = isFirstMessage ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
+  const system = buildSystemPrompt(clinic, config, greeting ? { channel: "whatsapp", greeting } : undefined);
   const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null };
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
