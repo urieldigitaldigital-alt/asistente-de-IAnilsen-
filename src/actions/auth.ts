@@ -1,11 +1,14 @@
 "use server";
 
-import { redirect } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 
 export interface AuthFormState {
   error: string | null;
+  // Se resuelve en el cliente con una recarga completa (window.location), no
+  // con router.push: así se garantiza que no quede en memoria ningún estado
+  // (datos ya renderizados, suscripciones Realtime) de la sesión anterior al
+  // cambiar de cuenta en la misma pestaña.
+  redirectTo?: string;
 }
 
 export async function login(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -23,7 +26,7 @@ export async function login(_prevState: AuthFormState, formData: FormData): Prom
     return { error: "Correo o contraseña incorrectos." };
   }
 
-  redirect("/dashboard");
+  return { error: null, redirectTo: "/dashboard" };
 }
 
 export async function signup(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -55,14 +58,13 @@ export async function signup(_prevState: AuthFormState, formData: FormData): Pro
   }
 
   if (!data.session) {
-    redirect("/login?message=confirm-email");
+    return { error: null, redirectTo: "/login?message=confirm-email" };
   }
 
-  redirect("/dashboard");
+  return { error: null, redirectTo: "/dashboard" };
 }
 
 export async function logout(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
 }

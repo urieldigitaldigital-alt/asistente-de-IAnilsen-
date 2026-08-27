@@ -13,6 +13,15 @@ const initialState: AuthFormState = { error: null };
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signup, initialState);
 
+  // Recarga completa (no navegación de Next.js) para asegurar que no quede
+  // en memoria ningún dato de una sesión anterior si se estaba usando otra
+  // cuenta en esta misma pestaña.
+  useEffect(() => {
+    if (state.redirectTo) window.location.href = state.redirectTo;
+  }, [state.redirectTo]);
+
+  const busy = pending || Boolean(state.redirectTo);
+
   // Default seguro para el render del servidor; en el cliente, apenas monta,
   // lo reemplazamos por la zona horaria real del navegador de quien se registra.
   const [timezone, setTimezone] = useState<string>(TIMEZONE_OPTIONS[0].value);
@@ -103,8 +112,8 @@ export function SignupForm() {
         )}
         <input type="hidden" name="timezone" value={timezone === CUSTOM_TIMEZONE_VALUE ? customTimezone : timezone} />
       </div>
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Creando cuenta…" : "Crear cuenta"}
+      <Button type="submit" disabled={busy} className="w-full">
+        {busy ? "Creando cuenta…" : "Crear cuenta"}
       </Button>
       <p className="text-center text-sm text-muted">
         ¿Ya tienes cuenta?{" "}

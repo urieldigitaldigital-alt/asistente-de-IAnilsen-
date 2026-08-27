@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import { login, type AuthFormState } from "@/actions/auth";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,15 @@ const initialState: AuthFormState = { error: null };
 
 export function LoginForm({ confirmEmail }: { confirmEmail: boolean }) {
   const [state, formAction, pending] = useActionState(login, initialState);
+
+  // Recarga completa (no navegación de Next.js) para asegurar que no quede
+  // en memoria ningún dato de una sesión anterior si se estaba usando otra
+  // cuenta en esta misma pestaña.
+  useEffect(() => {
+    if (state.redirectTo) window.location.href = state.redirectTo;
+  }, [state.redirectTo]);
+
+  const busy = pending || Boolean(state.redirectTo);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -32,8 +41,8 @@ export function LoginForm({ confirmEmail }: { confirmEmail: boolean }) {
         <Label htmlFor="password">Contraseña</Label>
         <Input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Ingresando…" : "Ingresar"}
+      <Button type="submit" disabled={busy} className="w-full">
+        {busy ? "Ingresando…" : "Ingresar"}
       </Button>
       <p className="text-center text-sm text-muted">
         ¿No tienes cuenta?{" "}
