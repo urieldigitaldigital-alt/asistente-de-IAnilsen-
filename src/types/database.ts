@@ -106,6 +106,8 @@ export interface Database {
           clinic_info: ClinicInfo;
           services: ClinicService[];
           menu_items: MenuItem[];
+          orders_paused: boolean;
+          pickup_only: boolean;
           business_hours: BusinessHours;
           voice: AgentVoiceConfig;
           language: string;

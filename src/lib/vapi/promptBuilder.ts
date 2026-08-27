@@ -1,4 +1,4 @@
-import { formatLocal, resolveTimeZone } from "@/lib/availability";
+import { formatLocal, isWithinBusinessHours, resolveTimeZone } from "@/lib/availability";
 import type { AgentConfig, BusinessHours, Clinic, ClinicService, MenuItem } from "@/types/database";
 
 const WEEKDAY_LABELS: Record<string, string> = {
@@ -117,6 +117,27 @@ function identityDefault(clinic: Clinic): string {
   }
 }
 
+/**
+ * Restricciones vigentes ahora mismo para tomar pedidos: fuera de horario,
+ * pausado a mano por el local (lleno), o solo retiro (sin envíos). Se le
+ * avisa al modelo de entrada para que no intente algo que createOrder va a
+ * rechazar de todos modos.
+ */
+function orderAvailabilityNote(clinic: Clinic, config: AgentConfig): string | null {
+  if (clinic.business_type !== "pedidos" && clinic.business_type !== "restaurante") return null;
+
+  if (!isWithinBusinessHours(config.business_hours, clinic.timezone)) {
+    return "\n## Estado actual del negocio\nEl negocio está CERRADO en este momento. No tomes pedidos — solo respondé consultas e informá el horario de atención.";
+  }
+  if (config.orders_paused) {
+    return "\n## Estado actual del negocio\nLos pedidos por teléfono están PAUSADOS temporalmente (el local está muy lleno). No tomes pedidos nuevos — solo respondé consultas, y avisá que por ahora no se están tomando pedidos.";
+  }
+  if (config.pickup_only) {
+    return "\n## Estado actual del negocio\nSolo se están aceptando pedidos para RETIRAR EN EL LOCAL — no hay envíos a domicilio por el momento. Si el cliente pide envío, avisale y ofrecé la opción de retiro.";
+  }
+  return null;
+}
+
 function contextSection(clinic: Clinic, config: AgentConfig): [string, string] | null {
   switch (clinic.business_type) {
     case "pedidos":
@@ -181,6 +202,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig): string {
     config.clinic_info.faq?.length
       ? `\n## Preguntas frecuentes\n${config.clinic_info.faq.map((item) => `- P: ${item.question}\n  R: ${item.answer}`).join("\n")}`
       : null,
+    orderAvailabilityNote(clinic, config),
     "",
     "## Flujo de la llamada",
     flowForType(clinic.business_type),

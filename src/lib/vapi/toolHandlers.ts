@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { findAvailability, formatLocal, parseLocalDateTime, type BusyRange } from "@/lib/availability";
+import { findAvailability, formatLocal, isWithinBusinessHours, parseLocalDateTime, type BusyRange } from "@/lib/availability";
 import { deleteCalendarEvent, getFreeBusy, insertCalendarEvent } from "@/lib/google/calendar";
 import {
   bookAppointmentSchema,
@@ -209,11 +209,21 @@ function handleGetMenu(ctx: ToolHandlerContext): string {
 }
 
 async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  if (ctx.config.orders_paused) {
+    return "En este momento no estamos tomando pedidos por teléfono, pero puedo responder cualquier consulta que tengas.";
+  }
+  if (!isWithinBusinessHours(ctx.config.business_hours, ctx.clinic.timezone)) {
+    return "En este momento estamos cerrados y no podemos tomar pedidos, pero puedo responder tus consultas o contarte el horario de atención.";
+  }
+
   const parsed = createOrderSchema.safeParse(rawArgs);
   if (!parsed.success) {
     return "Faltan datos para registrar el pedido. Necesito los productos con cantidad, tu nombre, teléfono y si es retiro o envío.";
   }
   const data = parsed.data;
+  if (data.orderType === "delivery" && ctx.config.pickup_only) {
+    return "Por el momento solo estamos aceptando pedidos para retirar en el local, no estamos haciendo envíos a domicilio. ¿Querés pedirlo para retirar?";
+  }
   if (data.orderType === "delivery" && !data.deliveryAddress?.trim()) {
     return "Para un envío a domicilio necesito la dirección de entrega.";
   }

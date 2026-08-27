@@ -4,11 +4,14 @@ import { CurrencyDollarIcon, ForkKnifeIcon, PrinterIcon } from "@phosphor-icons/
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { updateOrderStatusAction } from "@/actions/orders";
+import { setOrdersPausedAction, setPickupOnlyAction } from "@/actions/orderSettings";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderStatus } from "@/types/database";
+
+type OrderTypeFilter = "todos" | "pickup" | "delivery";
 
 const AUTO_PRINT_STORAGE_KEY = "pedidos_auto_print";
 
@@ -170,14 +173,46 @@ export function OrdersBoard({
   clinicName,
   timeZone,
   initialOrders,
+  initialOrdersPaused,
+  initialPickupOnly,
 }: {
   clinicId: string;
   clinicName: string;
   timeZone: string;
   initialOrders: Order[];
+  initialOrdersPaused: boolean;
+  initialPickupOnly: boolean;
 }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [isPending] = useTransition();
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>("todos");
+
+  // Interruptores del negocio (no del dispositivo): pausar pedidos por
+  // teléfono o aceptar solo retiro en el local. Se guardan en agent_configs
+  // y los lee también el asistente de VAPI para decidir si toma el pedido.
+  const [ordersPaused, setOrdersPausedState] = useState(initialOrdersPaused);
+  const [pickupOnly, setPickupOnlyState] = useState(initialPickupOnly);
+  const [, startSettingsTransition] = useTransition();
+
+  const handleTogglePaused = useCallback(
+    (checked: boolean) => {
+      setOrdersPausedState(checked);
+      startSettingsTransition(() => {
+        setOrdersPausedAction(clinicId, checked);
+      });
+    },
+    [clinicId]
+  );
+
+  const handleTogglePickupOnly = useCallback(
+    (checked: boolean) => {
+      setPickupOnlyState(checked);
+      startSettingsTransition(() => {
+        setPickupOnlyAction(clinicId, checked);
+      });
+    },
+    [clinicId]
+  );
 
   // Impresión automática del ticket: cada negocio (y cada dispositivo, ej.
   // la tablet de la cocina) la prende o apaga según si tiene una impresora
@@ -308,6 +343,34 @@ export function OrdersBoard({
           </label>
         </Card>
 
+        <Card className="flex flex-wrap items-center gap-6">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={ordersPaused}
+              onChange={(e) => handleTogglePaused(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Pausar pedidos por teléfono (solo consultas)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={pickupOnly}
+              onChange={(e) => handleTogglePickupOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Solo retiro en el local (sin envíos a domicilio)
+          </label>
+          {(ordersPaused || pickupOnly) && (
+            <p className="w-full text-xs text-amber-600 dark:text-amber-400">
+              {ordersPaused
+                ? "El asistente no está tomando pedidos por teléfono, solo responde consultas."
+                : "El asistente solo está aceptando pedidos para retirar en el local."}
+            </p>
+          )}
+        </Card>
+
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -329,10 +392,31 @@ export function OrdersBoard({
           </div>
         ) : (
           <>
+        <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 text-sm w-fit">
+          {(
+            [
+              { value: "todos", label: "Todos" },
+              { value: "pickup", label: "Para retirar" },
+              { value: "delivery", label: "Envío a domicilio" },
+            ] as const
+          ).map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setOrderTypeFilter(value)}
+              className={`rounded-md px-3 py-1 transition-colors ${
+                orderTypeFilter === value ? "bg-primary text-white" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {ACTIVE_STATUS_COLUMNS.map(({ status, label }) => {
             const columnOrders = sortByArrival(
-              orders.filter((o) => o.status === status),
+              orders.filter((o) => o.status === status && (orderTypeFilter === "todos" || o.order_type === orderTypeFilter)),
               status
             );
             return (

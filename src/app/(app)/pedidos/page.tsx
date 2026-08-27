@@ -10,11 +10,10 @@ export default async function PedidosPage() {
   const { data: clinic } = await supabase.from("clinics").select("id, name, timezone").single();
   if (!clinic) return null;
 
-  const { data: orders } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data: orders }, { data: config }] = await Promise.all([
+    supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(200),
+    supabase.from("agent_configs").select("orders_paused, pickup_only").eq("clinic_id", clinic.id).single(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -22,7 +21,14 @@ export default async function PedidosPage() {
         <h1 className="text-xl font-semibold">Pedidos</h1>
         <p className="text-sm text-muted">Pedidos tomados por teléfono, en tiempo real.</p>
       </div>
-      <OrdersBoard clinicId={clinic.id} clinicName={clinic.name} timeZone={clinic.timezone} initialOrders={orders ?? []} />
+      <OrdersBoard
+        clinicId={clinic.id}
+        clinicName={clinic.name}
+        timeZone={clinic.timezone}
+        initialOrders={orders ?? []}
+        initialOrdersPaused={config?.orders_paused ?? false}
+        initialPickupOnly={config?.pickup_only ?? false}
+      />
     </div>
   );
 }

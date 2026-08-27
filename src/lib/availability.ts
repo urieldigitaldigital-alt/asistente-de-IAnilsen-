@@ -126,6 +126,18 @@ export function formatLocal(date: Date, timeZone: string): string {
   return `${datePart}, a las ${hour12}${minuteText} ${period}`;
 }
 
+/** ¿El negocio está abierto ahora mismo según su horario de atención configurado? */
+export function isWithinBusinessHours(businessHours: BusinessHours, timeZone: string, now: Date = new Date()): boolean {
+  const parts = getZonedParts(now, resolveTimeZone(timeZone));
+  const hours = businessHours[parts.weekday];
+  if (!hours) return false;
+
+  const [startHour, startMinute] = hours.start.split(":").map(Number);
+  const [endHour, endMinute] = hours.end.split(":").map(Number);
+  const nowMinutes = parts.hour * 60 + parts.minute;
+  return nowMinutes >= startHour * 60 + startMinute && nowMinutes < endHour * 60 + endMinute;
+}
+
 export interface BusyRange {
   start: Date;
   end: Date;
