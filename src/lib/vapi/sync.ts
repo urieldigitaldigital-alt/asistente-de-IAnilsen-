@@ -168,6 +168,25 @@ export async function syncAssistant(): Promise<SyncAssistantResult> {
     .eq("clinic_id", clinic.id);
   if (updateError) throw updateError;
 
+  // Resguardo: si el número vinculado quedó con un assistantId fijo (de una
+  // versión vieja de este código, o un cambio manual en el dashboard de
+  // VAPI), lo limpiamos acá. Sin esto, `assistant-request` nunca se dispara
+  // y las llamadas usan el prompt/hora/menú congelados desde la última
+  // publicación en vez de armarse frescos en cada llamada.
+  if (config.vapi_phone_number_id) {
+    try {
+      const phoneNumber = await vapi.phoneNumbers.get({ id: config.vapi_phone_number_id });
+      if (phoneNumber.assistantId) {
+        await vapi.phoneNumbers.update({
+          id: config.vapi_phone_number_id,
+          body: { provider: phoneNumber.provider, assistantId: null } as unknown as Vapi.UpdatePhoneNumbersRequestBody,
+        });
+      }
+    } catch (err) {
+      console.error("No se pudo verificar/limpiar el assistantId fijo del número vinculado:", err);
+    }
+  }
+
   return { assistantId, created };
 }
 
