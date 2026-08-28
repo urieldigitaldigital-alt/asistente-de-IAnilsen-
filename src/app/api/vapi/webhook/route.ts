@@ -3,9 +3,28 @@ import { NextResponse, type NextRequest } from "next/server";
 import { constantTimeEqual } from "@/lib/crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
+import { buildFirstMessage } from "@/lib/vapi/promptBuilder";
 import { buildAssistantPayload } from "@/lib/vapi/sync";
 import { dispatchToolCall } from "@/lib/vapi/toolHandlers";
 import { vapiWebhookMessageSchema } from "@/lib/validation";
+
+// VAPI exige responder assistant-request en 7.5s totales (incluye el viaje de
+// red) o la llamada falla con "assistant-request-returned-error" — confirmado
+// en producción para números con poco tráfico (función fría). Si la búsqueda
+// de "cliente recurrente" (para personalizar el saludo) tarda de más,
+// preferimos contestar con el saludo genérico antes que arriesgar ese timeout.
+const GREETING_TIMEOUT_MS = 2500;
+
+async function buildGreetingWithTimeout(
+  admin: ReturnType<typeof createAdminClient>,
+  clinic: Parameters<typeof buildPersonalizedFirstMessage>[1],
+  config: Parameters<typeof buildPersonalizedFirstMessage>[2],
+  customerNumber: string | undefined
+): Promise<string> {
+  const fallback = buildFirstMessage(config, clinic);
+  const timeout = new Promise<string>((resolve) => setTimeout(() => resolve(fallback), GREETING_TIMEOUT_MS));
+  return Promise.race([buildPersonalizedFirstMessage(admin, clinic, config, customerNumber), timeout]);
+}
 
 function parseFunctionArguments(args: string | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!args) return {};
@@ -57,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const greeting = await buildPersonalizedFirstMessage(admin, clinic, config, message.call?.customer?.number);
+      const greeting = await buildGreetingWithTimeout(admin, clinic, config, message.call?.customer?.number);
       const assistant = buildAssistantPayload(clinic, config, greeting);
       return NextResponse.json({ assistant });
     } catch (err) {
