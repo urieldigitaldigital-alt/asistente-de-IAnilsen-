@@ -80,6 +80,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
+    // El número no tiene inbound_agents fijo (ver lib/retell/sync.ts), así que
+    // sin override_agent_id acá Retell no sabría qué agente atender la
+    // llamada — a diferencia de un número con agente fijo, donde este campo
+    // es opcional.
+    if (!config.retell_agent_id) {
+      console.error(`Retell call_inbound: el negocio ${config.clinic_id} todavía no publicó su asistente.`);
+      return NextResponse.json({ call_inbound: { reject: true } });
+    }
+
     const { data: clinic } = await admin.from("clinics").select("*").eq("id", config.clinic_id).single();
     if (!clinic) {
       return NextResponse.json({ error: "clinic_not_found" }, { status: 404 });
@@ -87,12 +96,12 @@ export async function POST(request: NextRequest) {
 
     try {
       const greeting = await buildGreetingWithTimeout(admin, clinic, config, parsed.data.call_inbound.from_number);
-      return NextResponse.json({ call_inbound: { dynamic_variables: { greeting } } });
+      return NextResponse.json({ call_inbound: { override_agent_id: config.retell_agent_id, dynamic_variables: { greeting } } });
     } catch (err) {
       console.error("Error armando el saludo dinámico de Retell:", err);
       // Red de seguridad: sin dynamic_variables, Retell usa
       // default_dynamic_variables (el saludo genérico ya guardado en el LLM).
-      return NextResponse.json({ call_inbound: {} });
+      return NextResponse.json({ call_inbound: { override_agent_id: config.retell_agent_id } });
     }
   }
 
