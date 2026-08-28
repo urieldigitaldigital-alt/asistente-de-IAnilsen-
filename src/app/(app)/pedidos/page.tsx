@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Pedidos — Asistente Nilsen IA" };
 
 export default async function PedidosPage() {
   const supabase = await createClient();
-  const { data: clinic } = await supabase.from("clinics").select("id, name, timezone").single();
+  const { data: clinic } = await supabase.from("clinics").select("id, name, timezone, address, phone").single();
   if (!clinic) return null;
 
   const [{ data: orders }, { data: config }] = await Promise.all([
@@ -24,6 +24,8 @@ export default async function PedidosPage() {
       <OrdersBoard
         clinicId={clinic.id}
         clinicName={clinic.name}
+        clinicAddress={clinic.address}
+        clinicPhone={clinic.phone}
         timeZone={clinic.timezone}
         initialOrders={orders ?? []}
         initialOrdersPaused={config?.orders_paused ?? false}

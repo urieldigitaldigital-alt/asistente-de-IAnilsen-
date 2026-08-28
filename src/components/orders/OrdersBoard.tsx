@@ -55,23 +55,49 @@ function formatTicketDateTime(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
+function TicketDivider() {
+  return <p className="my-1.5 border-t border-dashed border-black" />;
+}
+
+function money(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
 /**
- * Ticket de cocina: solo esto se ve al imprimir (ver print:hidden en el
- * resto del tablero) — ancho fijo pensado para impresora térmica de 80mm.
+ * Comanda de cocina/mostrador: solo esto se ve al imprimir (ver print:hidden
+ * en el resto del tablero) — ancho fijo pensado para impresora térmica de
+ * 80mm. Simple y funcional (lo que hay que preparar/entregar), no un
+ * comprobante de venta — usa siempre los datos del propio negocio.
  */
-function PrintTicket({ order, clinicName, timeZone }: { order: Order | null; clinicName: string; timeZone: string }) {
+function PrintTicket({
+  order,
+  clinicName,
+  clinicAddress,
+  clinicPhone,
+  timeZone,
+}: {
+  order: Order | null;
+  clinicName: string;
+  clinicAddress: string | null;
+  clinicPhone: string | null;
+  timeZone: string;
+}) {
   if (!order) return null;
   return (
-    <div className="hidden print:block print:w-full print:font-mono print:text-black">
-      <p className="text-center text-base font-bold">{clinicName}</p>
-      <p className="text-center text-2xl font-bold">Pedido #{order.order_number}</p>
-      <p className="text-center text-xs">{formatTicketDateTime(order.created_at, timeZone)}</p>
-      <p className="my-1 border-t border-dashed border-black" />
+    <div className="hidden print:block print:w-full print:font-mono print:text-black print:leading-snug">
+      <p className="text-center text-sm font-bold">{clinicName}</p>
+      {clinicAddress && <p className="text-center text-xs">{clinicAddress}</p>}
+      {clinicPhone && <p className="text-center text-xs">Tel: {clinicPhone}</p>}
+      <TicketDivider />
+      <div className="flex justify-between text-sm font-bold">
+        <span>Pedido #{order.order_number}</span>
+        <span>{formatTicketDateTime(order.created_at, timeZone)}</span>
+      </div>
       <p className="text-sm font-bold">{order.order_type === "delivery" ? "ENVÍO A DOMICILIO" : "RETIRA EN EL LOCAL"}</p>
-      {order.order_type === "delivery" && order.delivery_address && <p className="text-sm">{order.delivery_address}</p>}
-      <p className="text-sm">{order.customer_name}</p>
-      <p className="text-sm">{order.customer_phone}</p>
-      <p className="my-1 border-t border-dashed border-black" />
+      {order.order_type === "delivery" && order.delivery_address && <p className="text-sm">Dirección: {order.delivery_address}</p>}
+      <p className="text-sm">Cliente: {order.customer_name}</p>
+      <p className="text-sm">Tel: {order.customer_phone}</p>
+      <TicketDivider />
       <ul className="space-y-1 text-sm">
         {order.items.map((item, i) => (
           <li key={i}>
@@ -80,14 +106,17 @@ function PrintTicket({ order, clinicName, timeZone }: { order: Order | null; cli
           </li>
         ))}
       </ul>
-      <p className="my-1 border-t border-dashed border-black" />
+      <TicketDivider />
       {order.notes && (
         <>
           <p className="text-sm italic">Nota: {order.notes}</p>
-          <p className="my-1 border-t border-dashed border-black" />
+          <TicketDivider />
         </>
       )}
-      <p className="text-right text-base font-bold">Total: ${order.total.toFixed(2)}</p>
+      <div className="flex justify-between text-sm font-bold">
+        <span>TOTAL</span>
+        <span>{money(order.total)}</span>
+      </div>
     </div>
   );
 }
@@ -171,6 +200,8 @@ function OrderCard({
 export function OrdersBoard({
   clinicId,
   clinicName,
+  clinicAddress,
+  clinicPhone,
   timeZone,
   initialOrders,
   initialOrdersPaused,
@@ -178,6 +209,8 @@ export function OrdersBoard({
 }: {
   clinicId: string;
   clinicName: string;
+  clinicAddress: string | null;
+  clinicPhone: string | null;
   timeZone: string;
   initialOrders: Order[];
   initialOrdersPaused: boolean;
@@ -461,7 +494,13 @@ export function OrdersBoard({
         )}
       </div>
 
-      <PrintTicket order={printingOrder} clinicName={clinicName} timeZone={timeZone} />
+      <PrintTicket
+        order={printingOrder}
+        clinicName={clinicName}
+        clinicAddress={clinicAddress}
+        clinicPhone={clinicPhone}
+        timeZone={timeZone}
+      />
     </>
   );
 }
