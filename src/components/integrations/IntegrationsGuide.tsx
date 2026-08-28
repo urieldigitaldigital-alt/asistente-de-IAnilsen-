@@ -39,24 +39,24 @@ export function IntegrationsGuide() {
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <KeyIcon size={16} className="text-primary" /> 1. Conectá tu cuenta de Retell
+          <KeyIcon size={16} className="text-primary" /> 1. Conectá tu cuenta de VAPI
         </div>
         <div className="space-y-2 pl-1">
           <Step number={1} title="Entrá a">
             {" "}
-            <a href="https://www.retellai.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-              retellai.com
+            <a href="https://vapi.ai" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              vapi.ai
             </a>{" "}
             y creá una cuenta gratis con tu correo (no te pide tarjeta para registrarte).
           </Step>
-          <Step number={2} title="Adentro de Retell, buscá en el menú">
+          <Step number={2} title="Adentro de VAPI, buscá en el menú">
             &quot;Settings&quot; y después &quot;API Keys&quot;.
           </Step>
-          <Step number={3} title="Vas a ver una clave que empieza con">
-            &quot;key_&quot; — copiala con el ícono al lado (o seleccionala y copiala como cualquier texto).
+          <Step number={3} title="Vas a ver una clave llamada">
+            &quot;Private Key&quot; — copiala con el ícono al lado (o seleccionala y copiala como cualquier texto).
           </Step>
           <Step number={4} title="Volvé a esta página, pegala en la tarjeta">
-            &quot;Tu cuenta de Retell&quot; de más abajo, y tocá el botón &quot;Conectar&quot;.
+            &quot;Tu cuenta de VAPI&quot; de más abajo, y tocá el botón &quot;Conectar&quot;.
           </Step>
         </div>
       </div>
@@ -73,7 +73,7 @@ export function IntegrationsGuide() {
             (nombre del negocio, horarios, servicios) y ajustalos si hace falta.
           </Step>
           <Step number={3} title="Al final de la página, tocá">
-            el botón &quot;Publicar&quot;. Esto crea tu asistente de voz en Retell.
+            el botón &quot;Publicar&quot;. Esto crea tu asistente de voz en VAPI.
           </Step>
         </div>
       </div>
@@ -90,21 +90,28 @@ export function IntegrationsGuide() {
                 &quot;Asistente y número de teléfono&quot; de más abajo, tocá &quot;Obtener número automáticamente&quot;.
               </Step>
               <Step number={2} title="Ojo:">
-                Retell puede pedirte cargar una tarjeta la primera vez (adentro de retellai.com: Settings → Billing).
+                VAPI puede pedirte cargar una tarjeta la primera vez (adentro de vapi.ai: Settings → Billing).
               </Step>
             </div>
           </div>
           <div>
             <p className="text-sm font-medium">Opción con número de Argentina (recomendada para tus clientes):</p>
             <div className="mt-2 space-y-2">
-              <Step number={1} title="Comprá un número argentino">
-                en un proveedor de SIP trunk (ej. DIDWW) — Retell no vende números de Argentina directamente.
+              <Step number={1} title="Entrá a">
+                {" "}
+                <a href="https://twilio.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                  twilio.com
+                </a>{" "}
+                y creá una cuenta.
               </Step>
-              <Step number={2} title="En el dashboard de Retell">
-                importá ese número por SIP trunk (Phone Numbers → Import), con los datos que te da tu proveedor.
+              <Step number={2} title="Comprá un número argentino">
+                (te van a pedir verificar tu identidad, puede tardar un poco).
               </Step>
-              <Step number={3} title="Volvé a esta página">
-                , abrí &quot;Ya tengo un número en Retell&quot;, pegá el número y tocá &quot;Vincular&quot;.
+              <Step number={3} title="En la Consola de Twilio">
+                copiá el &quot;Account SID&quot; y el &quot;Auth Token&quot; (están en la página principal, apenas entrás).
+              </Step>
+              <Step number={4} title="Volvé a esta página">
+                , abrí &quot;Importar un número propio de Twilio&quot;, pegá esos 3 datos y tocá &quot;Importar y vincular&quot;.
               </Step>
             </div>
           </div>

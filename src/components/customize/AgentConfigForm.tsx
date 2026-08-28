@@ -48,7 +48,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [menuItems, setMenuItems] = useState<MenuItem[]>(config.menu_items ?? []);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(config.business_hours);
 
-  const [voiceId, setVoiceId] = useState(config.voice.voiceId || "retell-Andrea");
+  const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
+  const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
   const [speed, setSpeed] = useState(config.voice.speed ?? 1.15);
   const [language, setLanguage] = useState(config.language);
   const [modelName, setModelName] = useState(config.model.model || "gpt-4.1");
@@ -65,7 +66,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         services,
         menu_items: menuItems,
         business_hours: businessHours,
-        voice: { provider: "retell", voiceId, speed },
+        voice: { provider: voiceProvider, voiceId, speed },
         language,
         model: { provider: "openai", model: modelName },
         first_message: firstMessage,
@@ -80,6 +81,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       services,
       menuItems,
       businessHours,
+      voiceProvider,
       voiceId,
       speed,
       language,
@@ -133,6 +135,8 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       ) : null}
       <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
       <VoiceLanguageSelect
+        voiceProvider={voiceProvider}
+        onVoiceProviderChange={setVoiceProvider}
         voiceId={voiceId}
         onVoiceIdChange={setVoiceId}
         speed={speed}
@@ -143,7 +147,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         onModelNameChange={setModelName}
       />
 
-      <SandboxChat systemPrompt={systemPrompt} />
+      <SandboxChat systemPrompt={systemPrompt} modelName={modelName} />
 
       <div className="sticky bottom-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <form action={saveAction}>

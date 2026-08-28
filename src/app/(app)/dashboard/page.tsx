@@ -111,8 +111,8 @@ export default async function DashboardPage() {
         </Card>
         <IntegrationStatus
           googleConnected={data.googleConnected}
-          retellAgentId={data.retellAgentId}
-          retellPhoneNumber={data.retellPhoneNumber}
+          vapiAssistantId={data.vapiAssistantId}
+          vapiPhoneNumberId={data.vapiPhoneNumberId}
         />
       </div>
 

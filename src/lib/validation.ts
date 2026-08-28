@@ -159,7 +159,7 @@ export const agentConfigFormSchema = z.object({
   handoff_message: z.string().optional(),
 });
 
-export const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 
 export const clinicDetailsSchema = z.object({
   name: z.string().min(1),
@@ -177,12 +177,18 @@ export const clinicDetailsSchema = z.object({
   business_type: z.enum(["citas", "pedidos", "restaurante", "inmobiliaria", "llamadas"]),
 });
 
-export const retellApiKeyFormSchema = z.object({
-  apiKey: z.string().regex(/^key_[a-zA-Z0-9]+$/, "La clave de API de Retell no tiene el formato esperado (empieza con 'key_')."),
+export const vapiPhoneNumberFormSchema = z.object({
+  phoneNumberId: z.string().uuid(),
 });
 
-export const retellPhoneNumberFormSchema = z.object({
-  phoneNumber: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
+export const vapiApiKeyFormSchema = z.object({
+  apiKey: z.string().uuid("La clave de API de VAPI no tiene el formato esperado."),
+});
+
+export const twilioImportFormSchema = z.object({
+  number: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
+  twilioAccountSid: z.string().regex(/^AC[a-zA-Z0-9]{32}$/, "Account SID de Twilio inválido (empieza con 'AC')."),
+  twilioAuthToken: z.string().min(20, "Auth Token de Twilio inválido."),
 });
 
 export const whatsappCredentialsFormSchema = z.object({
@@ -258,51 +264,5 @@ export const vapiWebhookMessageSchema = z.object({
     cost: z.number().optional(),
     startedAt: z.string().optional(),
     endedAt: z.string().optional(),
-  }),
-});
-
-// ---------------------------------------------------------------------------
-// Retell webhooks
-// ---------------------------------------------------------------------------
-
-// Webhook por-número ("call_inbound"): llega antes de que exista un objeto
-// de llamada, con forma distinta a los eventos de ciclo de vida de abajo.
-export const retellInboundWebhookSchema = z.object({
-  event: z.literal("call_inbound"),
-  call_inbound: z.object({
-    from_number: z.string().optional(),
-    to_number: z.string().optional(),
-    agent_id: z.string().optional(),
-  }),
-});
-
-// Webhook por-agente: call_started / call_ended / call_analyzed, todos
-// envuelven un objeto "call" con la misma forma base.
-export const retellCallEventSchema = z.object({
-  event: z.string(),
-  call: z.object({
-    call_id: z.string(),
-    agent_id: z.string().optional(),
-    direction: z.enum(["inbound", "outbound"]).optional(),
-    from_number: z.string().optional(),
-    to_number: z.string().optional(),
-    start_timestamp: z.number().optional(),
-    end_timestamp: z.number().optional(),
-    disconnection_reason: z.string().optional(),
-    transcript: z.string().optional(),
-    recording_url: z.string().optional(),
-    call_cost: z.object({ combined_cost: z.number().optional() }).optional(),
-    call_analysis: z.object({ call_summary: z.string().optional() }).optional(),
-  }),
-});
-
-// Body de cada tool call individual que Retell manda al webhook de tools
-// (uno por invocación, a diferencia del toolCallList agrupado de VAPI).
-export const retellToolCallSchema = z.object({
-  name: z.string(),
-  args: z.record(z.string(), z.unknown()).optional(),
-  call: z.object({
-    call_id: z.string().optional(),
-    agent_id: z.string().optional(),
   }),
 });

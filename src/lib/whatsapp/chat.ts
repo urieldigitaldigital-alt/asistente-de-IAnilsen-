@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
 import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
+import { buildAssistantTools } from "@/lib/vapi/tools";
 import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
-import { buildDomainTools } from "@/lib/retell/tools";
 import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/database";
 
 const MODEL = "claude-haiku-4-5";
@@ -17,16 +17,21 @@ function getAnthropicClient(): Anthropic {
 }
 
 /**
- * Mismas tools de dominio que usan las llamadas (mismo `dispatchToolCall`,
- * misma lógica de negocio) traducidas al formato de Claude — sin tools
- * nativas de colgar/transferir, que no aplican a una conversación de texto.
+ * Mismas tools que usan las llamadas (mismo `dispatchToolCall`, misma lógica
+ * de negocio) traducidas al formato de Claude — sin las nativas de VAPI
+ * (endCall/transferCall), que no aplican a una conversación de texto.
  */
 function buildClaudeTools(businessType: BusinessType): Anthropic.Tool[] {
-  return buildDomainTools(businessType).map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    input_schema: tool.parameters as Anthropic.Tool.InputSchema,
-  }));
+  return buildAssistantTools({ businessType })
+    .filter((tool) => tool.type === "function" && tool.function)
+    .map((tool) => {
+      const fn = (tool as Extract<typeof tool, { type: "function" }>).function!;
+      return {
+        name: fn.name!,
+        description: fn.description,
+        input_schema: (fn.parameters ?? { type: "object", properties: {} }) as Anthropic.Tool.InputSchema,
+      };
+    });
 }
 
 export interface WhatsappConversation {

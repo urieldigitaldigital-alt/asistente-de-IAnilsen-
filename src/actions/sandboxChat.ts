@@ -1,52 +1,66 @@
 "use server";
 
-import Anthropic from "@anthropic-ai/sdk";
+import type { Vapi } from "@vapi-ai/server-sdk";
 
-export interface SandboxMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+import { createClient } from "@/lib/supabase/server";
+import { getTenantVapiClient } from "@/lib/vapi/credentials";
+import { friendlyVapiError } from "@/lib/vapi/friendlyError";
 
 export interface SandboxChatResult {
   reply: string;
+  chatId: string | null;
   error: string | null;
 }
 
-const MODEL = "claude-haiku-4-5";
-
 /**
  * Sandbox de "Probar": manda un mensaje de texto contra el system prompt
- * actual (aún sin publicar) usando Claude directo, sin tools ni voz — el
- * historial lo manda el cliente (ya lo tiene en su propio estado), no hace
- * falta guardar nada del lado del servidor.
+ * actual (aún sin publicar) usando el chat de VAPI, sin tools ni voz.
  */
 export async function sendSandboxMessageAction(
   systemPrompt: string,
-  history: SandboxMessage[],
-  message: string
+  modelName: string,
+  message: string,
+  previousChatId: string | null
 ): Promise<SandboxChatResult> {
   if (!message.trim()) {
-    return { reply: "", error: "Escribe un mensaje para probar." };
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { reply: "", error: "ANTHROPIC_API_KEY no está configurada." };
+    return { reply: "", chatId: previousChatId, error: "Escribe un mensaje para probar." };
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey });
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [...history, { role: "user", content: message }],
+    const supabase = await createClient();
+    const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
+    if (clinicError || !clinic) {
+      return { reply: "", chatId: previousChatId, error: "No se encontró el negocio del usuario." };
+    }
+
+    const vapi = await getTenantVapiClient(clinic.id, supabase);
+    const response = await vapi.chats.create({
+      input: message,
+      previousChatId: previousChatId ?? undefined,
+      assistant: previousChatId
+        ? undefined
+        : {
+            model: {
+              provider: "openai",
+              model: (modelName || "gpt-4.1") as Vapi.OpenAiModelModel,
+              messages: [{ role: "system", content: systemPrompt }],
+            },
+          },
     });
 
-    const textBlock = response.content.find((block) => block.type === "text");
-    return { reply: textBlock && textBlock.type === "text" ? textBlock.text : "(sin respuesta)", error: null };
+    if (!("output" in response)) {
+      return { reply: "", chatId: previousChatId, error: "El sandbox no soporta respuestas en streaming." };
+    }
+
+    const lastAssistantMessage = [...(response.output ?? [])].reverse().find((item) => item.role === "assistant");
+
+    return {
+      reply: (lastAssistantMessage && "content" in lastAssistantMessage && lastAssistantMessage.content) || "(sin respuesta)",
+      chatId: response.id,
+      error: null,
+    };
   } catch (err) {
-    console.error("Error en sandbox de chat:", err);
-    return { reply: "", error: err instanceof Error ? err.message : "Error al probar el prompt." };
+    console.error("Error en sandbox de chat de VAPI:", err);
+    return { reply: "", chatId: previousChatId, error: friendlyVapiError(err, "Error al probar el prompt.") };
   }
 }
