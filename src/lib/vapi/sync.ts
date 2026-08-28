@@ -91,23 +91,17 @@ export interface SyncAssistantResult {
  * clinic/agent_configs. Se usa tanto para publicar el assistant persistido
  * (botón "Publicar") como, con un saludo distinto, en la respuesta al evento
  * `assistant-request` (saludo personalizado por llamada).
- *
- * El asistente no habla primero: espera a que el cliente diga algo (evita
- * "pisar" al que llama) y el saludo se le pasa al modelo como instrucción de
- * apertura dentro del system prompt en vez de como `firstMessage` fijo — VAPI
- * no reproduce `firstMessage` cuando `firstMessageMode` es
- * "assistant-waits-for-user".
  */
 export function buildAssistantPayload(clinic: Clinic, config: AgentConfig, greeting: string) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
 
-  const systemPrompt = buildSystemPrompt(clinic, config, { channel: "call", greeting });
+  const systemPrompt = buildSystemPrompt(clinic, config);
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
   return {
     name: clinic.name.slice(0, 40),
-    firstMessageMode: "assistant-waits-for-user" as Vapi.CreateAssistantDtoFirstMessageMode,
+    firstMessage: greeting,
     model: buildModel(config.model, tools, systemPrompt),
     voice: buildVoice(config.voice),
     transcriber: buildTranscriber(config.language),
