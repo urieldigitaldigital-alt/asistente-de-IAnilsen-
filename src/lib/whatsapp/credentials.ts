@@ -108,6 +108,26 @@ export async function getWhatsappCredentialsByPhoneNumberId(
   };
 }
 
+/** Credenciales descifradas del propio negocio del usuario autenticado (respeta RLS) — uso: responder manualmente desde el panel. */
+export async function getOwnWhatsappCredentials(
+  clinicId: string,
+  supabase: SupabaseClient<Database>
+): Promise<DecryptedWhatsappCredentials | null> {
+  const { data, error } = await supabase
+    .from("whatsapp_credentials")
+    .select("whatsapp_number, meta_phone_number_id, meta_access_token_encrypted, meta_verify_token")
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    whatsappNumber: data.whatsapp_number,
+    metaPhoneNumberId: data.meta_phone_number_id,
+    metaAccessToken: decrypt(data.meta_access_token_encrypted),
+    metaVerifyToken: decrypt(data.meta_verify_token),
+  };
+}
+
 /** Busca, entre todos los negocios, el que tenga este verify token — usado en la verificación GET del webhook de Meta. */
 export async function findClinicByVerifyToken(
   verifyToken: string,

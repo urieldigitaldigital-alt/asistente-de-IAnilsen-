@@ -5,9 +5,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { WhatsappConversationStatus } from "@/types/database";
 import { friendlyVapiError } from "@/lib/vapi/friendlyError";
-import { saveWhatsappCredentials } from "@/lib/whatsapp/credentials";
-import { updateConversationStatus } from "@/lib/whatsapp/messages";
-import { whatsappCredentialsFormSchema } from "@/lib/validation";
+import { getOwnWhatsappCredentials, saveWhatsappCredentials } from "@/lib/whatsapp/credentials";
+import { logWhatsappMessage, updateConversationStatus } from "@/lib/whatsapp/messages";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/meta";
+import { whatsappCredentialsFormSchema, whatsappReplySchema } from "@/lib/validation";
 
 export interface WhatsappActionState {
   error: string | null;
@@ -42,4 +43,46 @@ export async function updateWhatsappStatusAction(sessionId: string, status: What
   const supabase = await createClient();
   await updateConversationStatus(supabase, sessionId, status);
   revalidatePath("/whatsapp");
+}
+
+export interface SendWhatsappReplyState {
+  error: string | null;
+}
+
+/** Contesta manualmente desde el panel una conversación de WhatsApp (además de las respuestas automáticas del asistente). */
+export async function sendWhatsappReplyAction(sessionId: string, body: string): Promise<SendWhatsappReplyState> {
+  const parsed = whatsappReplySchema.safeParse({ body });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Mensaje inválido." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
+  if (clinicError || !clinic) return { error: "No se encontró el negocio del usuario." };
+
+  const { data: session, error: sessionError } = await supabase
+    .from("whatsapp_sessions")
+    .select("id, customer_phone")
+    .eq("id", sessionId)
+    .single();
+  if (sessionError || !session) return { error: "No se encontró la conversación." };
+
+  const credentials = await getOwnWhatsappCredentials(clinic.id, supabase);
+  if (!credentials) return { error: "Conectá WhatsApp en Integraciones antes de contestar desde acá." };
+
+  try {
+    await sendWhatsAppMessage({
+      phoneNumberId: credentials.metaPhoneNumberId,
+      accessToken: credentials.metaAccessToken,
+      to: session.customer_phone,
+      body: parsed.data.body,
+    });
+    await logWhatsappMessage(supabase, { clinicId: clinic.id, sessionId: session.id, role: "business", body: parsed.data.body });
+    revalidatePath("/whatsapp");
+    return { error: null };
+  } catch (err) {
+    console.error("Error enviando la respuesta manual de WhatsApp:", err);
+    return { error: "No se pudo enviar el mensaje. Revisá que el Access Token de Meta en Integraciones siga vigente." };
+  }
 }

@@ -199,6 +199,10 @@ export const whatsappCredentialsFormSchema = z.object({
   metaVerifyToken: z.string().min(4, "Elegí un Verify Token de al menos 4 caracteres."),
 });
 
+export const whatsappReplySchema = z.object({
+  body: z.string().trim().min(1, "Escribí un mensaje.").max(4096, "El mensaje es demasiado largo."),
+});
+
 // ---------------------------------------------------------------------------
 // VAPI webhook envelope
 // ---------------------------------------------------------------------------
