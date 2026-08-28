@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const greeting = await buildGreetingWithTimeout(admin, clinic, config, message.call?.customer?.number);
+      const greeting = await buildGreetingWithTimeout(admin, clinic, config, message.call?.customer?.number ?? undefined);
       const assistant = buildAssistantPayload(clinic, config, greeting);
       return NextResponse.json({ assistant });
     } catch (err) {
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       const results = await Promise.all(
         toolCalls.map(async (toolCall) => {
           const name = toolCall.name ?? toolCall.function?.name ?? "";
-          const rawArgs = toolCall.parameters ?? toolCall.arguments ?? parseFunctionArguments(toolCall.function?.arguments);
+          const rawArgs = toolCall.parameters ?? toolCall.arguments ?? parseFunctionArguments(toolCall.function?.arguments ?? undefined);
           const result = await dispatchToolCall(ctx, name, rawArgs).catch((err: unknown) => {
             console.error(`Error ejecutando la tool "${name}":`, err);
             return "Ocurrió un error interno al procesar la solicitud.";

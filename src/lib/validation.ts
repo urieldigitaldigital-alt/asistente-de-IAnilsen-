@@ -209,60 +209,67 @@ export const whatsappReplySchema = z.object({
 
 export const vapiToolCallSchema = z.object({
   id: z.string(),
-  name: z.string().optional(),
-  parameters: z.record(z.string(), z.unknown()).optional(),
-  arguments: z.record(z.string(), z.unknown()).optional(),
+  name: z.string().nullish(),
+  parameters: z.record(z.string(), z.unknown()).nullish(),
+  arguments: z.record(z.string(), z.unknown()).nullish(),
   function: z
     .object({
       name: z.string(),
-      arguments: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+      arguments: z.union([z.string(), z.record(z.string(), z.unknown())]).nullish(),
     })
-    .optional(),
+    .nullish(),
 });
 
+// VAPI manda explícitamente `null` en muchos campos ausentes (en vez de
+// omitirlos) — ej. `call.assistantId: null` en el evento assistant-request de
+// números sin assistant fijo (que es como funcionan todos nuestros números).
+// `.optional()` de Zod NO acepta `null`, solo `undefined`, así que un solo
+// campo con `.optional()` en vez de `.nullish()` acá rompe TODA la validación
+// del payload — confirmado en producción: causó "assistant-request-returned-error"
+// en el 100% de las llamadas entrantes.
 export const vapiWebhookMessageSchema = z.object({
   message: z.object({
     type: z.string(),
     call: z
       .object({
-        id: z.string().optional(),
-        phoneNumberId: z.string().optional(),
-        assistantId: z.string().optional(),
-        customer: z.object({ number: z.string().optional() }).optional(),
+        id: z.string().nullish(),
+        phoneNumberId: z.string().nullish(),
+        assistantId: z.string().nullish(),
+        customer: z.object({ number: z.string().nullish() }).nullish(),
         // Presente en el evento assistant-request (todavía no existe `id`/`phoneNumberId` planos en esa etapa).
-        phoneNumber: z.object({ id: z.string().optional(), number: z.string().optional() }).optional(),
+        phoneNumber: z.object({ id: z.string().nullish(), number: z.string().nullish() }).nullish(),
       })
-      .optional(),
+      .nullish(),
     // Presente en tool-calls disparados desde la Chat API (ej. WhatsApp) en vez de una llamada.
     chat: z
       .object({
-        id: z.string().optional(),
-        assistantId: z.string().optional(),
+        id: z.string().nullish(),
+        assistantId: z.string().nullish(),
       })
-      .optional(),
-    toolCallList: z.array(vapiToolCallSchema).optional(),
-    toolCalls: z.array(vapiToolCallSchema).optional(),
-    endedReason: z.string().optional(),
+      .nullish(),
+    toolCallList: z.array(vapiToolCallSchema).nullish(),
+    toolCalls: z.array(vapiToolCallSchema).nullish(),
+    endedReason: z.string().nullish(),
     artifact: z
       .object({
-        transcript: z.string().optional(),
+        transcript: z.string().nullish(),
         messages: z
           .array(
             z.object({
-              role: z.string().optional(),
-              message: z.string().optional(),
+              role: z.string().nullish(),
+              message: z.string().nullish(),
             })
           )
-          .optional(),
+          .nullish(),
       })
-      .optional(),
+      .nullish(),
     analysis: z
       .object({
-        summary: z.string().optional(),
+        summary: z.string().nullish(),
       })
-      .optional(),
-    cost: z.number().optional(),
-    startedAt: z.string().optional(),
-    endedAt: z.string().optional(),
+      .nullish(),
+    cost: z.number().nullish(),
+    startedAt: z.string().nullish(),
+    endedAt: z.string().nullish(),
   }),
 });
