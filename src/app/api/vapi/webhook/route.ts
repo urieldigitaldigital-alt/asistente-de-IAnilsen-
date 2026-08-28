@@ -48,9 +48,16 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.json().catch(() => null);
   const parsedBody = vapiWebhookMessageSchema.safeParse(rawBody);
   if (!parsedBody.success) {
+    // Log temporal: VAPI manda mensajes de tipos que todavía no soportamos
+    // (ej. artefactos de debugging cuando algo falla armando el assistant) y
+    // hoy los descartamos en silencio sin poder ver qué contienen.
+    console.error("Payload de VAPI no reconocido:", JSON.stringify(rawBody)?.slice(0, 4000));
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
   const { message } = parsedBody.data;
+  if (message.type !== "tool-calls" && message.type !== "status-update" && message.type !== "transcript") {
+    console.error(`VAPI webhook: ${message.type}`, JSON.stringify(rawBody)?.slice(0, 4000));
+  }
   const admin = createAdminClient();
 
   // Llega una vez al inicio de cada llamada entrante (el número no tiene un
