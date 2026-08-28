@@ -13,7 +13,7 @@ import {
   reserveTableSchema,
   scheduleVisitSchema,
 } from "@/lib/validation";
-import { TOOL_NAMES } from "@/lib/vapi/tools";
+import { TOOL_NAMES } from "@/lib/retell/tools";
 import type { AgentConfig, Clinic, Database } from "@/types/database";
 
 type AdminClient = SupabaseClient<Database>;

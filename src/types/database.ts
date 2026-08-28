@@ -114,8 +114,11 @@ export interface Database {
           model: AgentModelConfig;
           first_message: string;
           handoff_message: string | null;
-          vapi_assistant_id: string | null;
-          vapi_phone_number_id: string | null;
+          retell_agent_id: string | null;
+          retell_llm_id: string | null;
+          retell_phone_number: string | null;
+          retell_outbound_agent_id: string | null;
+          retell_outbound_llm_id: string | null;
           updated_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["agent_configs"]["Row"]> & {
@@ -144,17 +147,17 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["google_credentials"]["Row"]>;
         Relationships: [];
       };
-      vapi_credentials: {
+      retell_credentials: {
         Row: {
           clinic_id: string;
           api_key_encrypted: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["vapi_credentials"]["Row"]> & {
+        Insert: Partial<Database["public"]["Tables"]["retell_credentials"]["Row"]> & {
           clinic_id: string;
           api_key_encrypted: string;
         };
-        Update: Partial<Database["public"]["Tables"]["vapi_credentials"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["retell_credentials"]["Row"]>;
         Relationships: [];
       };
       whatsapp_credentials: {
@@ -216,7 +219,7 @@ export interface Database {
         Row: {
           id: string;
           clinic_id: string;
-          vapi_call_id: string;
+          retell_call_id: string | null;
           started_at: string | null;
           ended_at: string | null;
           phone_number: string | null;
@@ -228,7 +231,6 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["calls"]["Row"]> & {
           clinic_id: string;
-          vapi_call_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
         Relationships: [];
@@ -249,6 +251,7 @@ export interface Database {
           is_new_patient: boolean;
           status: AppointmentStatus;
           notes: string | null;
+          reminder_called_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["appointments"]["Row"]> & {
@@ -276,6 +279,7 @@ export interface Database {
           total: number;
           status: OrderStatus;
           notes: string | null;
+          order_ready_called_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -363,6 +367,7 @@ export interface Database {
           visit_time: string;
           status: VisitStatus;
           notes: string | null;
+          reminder_called_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -428,7 +433,7 @@ export type Clinic = Database["public"]["Tables"]["clinics"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type AgentConfig = Database["public"]["Tables"]["agent_configs"]["Row"];
 export type GoogleCredentials = Database["public"]["Tables"]["google_credentials"]["Row"];
-export type VapiCredentials = Database["public"]["Tables"]["vapi_credentials"]["Row"];
+export type RetellCredentials = Database["public"]["Tables"]["retell_credentials"]["Row"];
 export type WhatsappCredentials = Database["public"]["Tables"]["whatsapp_credentials"]["Row"];
 export type WhatsappSession = Database["public"]["Tables"]["whatsapp_sessions"]["Row"];
 export type WhatsappMessage = Database["public"]["Tables"]["whatsapp_messages"]["Row"];

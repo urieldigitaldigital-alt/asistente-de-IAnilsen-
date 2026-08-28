@@ -30,12 +30,12 @@ function Row({
 
 export function IntegrationStatus({
   googleConnected,
-  vapiAssistantId,
-  vapiPhoneNumberId,
+  retellAgentId,
+  retellPhoneNumber,
 }: {
   googleConnected: boolean;
-  vapiAssistantId: string | null;
-  vapiPhoneNumberId: string | null;
+  retellAgentId: string | null;
+  retellPhoneNumber: string | null;
 }) {
   return (
     <Card className="space-y-4">
@@ -49,8 +49,8 @@ export function IntegrationStatus({
       />
       <Row
         icon={PhoneIcon}
-        label="Asistente y número de VAPI"
-        connected={Boolean(vapiAssistantId && vapiPhoneNumberId)}
+        label="Asistente y número de Retell"
+        connected={Boolean(retellAgentId && retellPhoneNumber)}
         connectedLabel="Provisionado"
         disconnectedLabel="Pendiente de publicar"
       />

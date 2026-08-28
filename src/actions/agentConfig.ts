@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
+import { friendlyRetellError } from "@/lib/retell/friendlyError";
+import { syncAgent } from "@/lib/retell/sync";
 import { createClient } from "@/lib/supabase/server";
 import { agentConfigFormSchema, clinicDetailsSchema } from "@/lib/validation";
-import { syncAssistant } from "@/lib/vapi/sync";
 
 export interface AgentConfigActionState {
   error: string | null;
@@ -58,7 +59,7 @@ export async function saveAgentConfigAction(
   if (error) return { error, success: null };
 
   revalidatePath("/personalizacion");
-  return { error: null, success: "Cambios guardados. No olvides publicar para sincronizar con VAPI." };
+  return { error: null, success: "Cambios guardados. No olvides publicar para sincronizar con Retell." };
 }
 
 export async function saveAndPublishAgentConfigAction(
@@ -69,17 +70,17 @@ export async function saveAndPublishAgentConfigAction(
   if (error) return { error, success: null };
 
   try {
-    const result = await syncAssistant();
+    const result = await syncAgent();
     revalidatePath("/personalizacion");
     revalidatePath("/integraciones");
     revalidatePath("/dashboard");
     return {
       error: null,
-      success: result.created ? "Guardado y asistente creado en VAPI." : "Guardado y publicado en VAPI.",
+      success: result.created ? "Guardado y asistente creado en Retell." : "Guardado y publicado en Retell.",
     };
   } catch (err) {
-    console.error("Error publicando el asistente en VAPI:", err);
+    console.error("Error publicando el asistente en Retell:", err);
     revalidatePath("/personalizacion");
-    return { error: err instanceof Error ? err.message : "Se guardó, pero no se pudo publicar en VAPI.", success: null };
+    return { error: friendlyRetellError(err, "Se guardó, pero no se pudo publicar en Retell."), success: null };
   }
 }

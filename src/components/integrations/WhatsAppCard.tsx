@@ -12,11 +12,11 @@ const idleState: WhatsappActionState = { error: null, success: null };
 
 export function WhatsAppCard({
   connected,
-  assistantId,
+  agentId,
   initialValues,
 }: {
   connected: boolean;
-  assistantId: string | null;
+  agentId: string | null;
   initialValues: { whatsappNumber: string; metaPhoneNumberId: string; metaVerifyToken: string } | null;
 }) {
   const [state, formAction, pending] = useActionState(saveWhatsappCredentialsAction, idleState);
@@ -42,7 +42,7 @@ export function WhatsAppCard({
         )}
       </p>
 
-      {!assistantId && (
+      {!agentId && (
         <p className="text-sm text-muted">Publica el asistente desde Personalización antes de conectar WhatsApp.</p>
       )}
 
@@ -89,7 +89,7 @@ export function WhatsAppCard({
             Este valor lo elegís vos — usá el mismo texto acá y en el webhook de Meta.
           </p>
         </div>
-        <Button type="submit" disabled={pending || !assistantId} className="w-full">
+        <Button type="submit" disabled={pending || !agentId} className="w-full">
           {pending ? "Guardando…" : connected ? "Actualizar" : "Conectar WhatsApp"}
         </Button>
         {state.error && <p className="text-sm text-danger">{state.error}</p>}

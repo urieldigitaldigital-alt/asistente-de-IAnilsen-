@@ -35,8 +35,8 @@ export interface DashboardData {
   chart: DashboardChartPoint[];
   recentCalls: DashboardRecentCall[];
   googleConnected: boolean;
-  vapiAssistantId: string | null;
-  vapiPhoneNumberId: string | null;
+  retellAgentId: string | null;
+  retellPhoneNumber: string | null;
   whatsappMessagesToday: number;
   whatsappConversationsActive: number;
   whatsappNeedsFollowUp: number;
@@ -121,7 +121,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
       .select("id, started_at, created_at, phone_number, status, summary")
       .order("created_at", { ascending: false })
       .limit(5),
-    supabase.from("agent_configs").select("vapi_assistant_id, vapi_phone_number_id").single(),
+    supabase.from("agent_configs").select("retell_agent_id, retell_phone_number").single(),
     supabase.from("google_credentials").select("clinic_id").maybeSingle(),
     supabase.from("whatsapp_messages").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "active"),
@@ -189,8 +189,8 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     chart,
     recentCalls,
     googleConnected: Boolean(googleRes.data),
-    vapiAssistantId: configRes.data?.vapi_assistant_id ?? null,
-    vapiPhoneNumberId: configRes.data?.vapi_phone_number_id ?? null,
+    retellAgentId: configRes.data?.retell_agent_id ?? null,
+    retellPhoneNumber: configRes.data?.retell_phone_number ?? null,
     whatsappMessagesToday: whatsappMessagesTodayRes.count ?? 0,
     whatsappConversationsActive: whatsappActiveRes.count ?? 0,
     whatsappNeedsFollowUp: whatsappFollowUpRes.count ?? 0,
