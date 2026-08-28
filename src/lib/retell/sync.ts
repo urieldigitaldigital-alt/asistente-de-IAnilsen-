@@ -7,6 +7,12 @@ import { buildFirstMessage, buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import type { AgentConfig, Clinic } from "@/types/database";
 
 const DEFAULT_RETELL_VOICE_ID = "retell-Andrea";
+// Prefijos reales de voice_id en el catálogo de Retell (confirmados contra
+// client.voice.list() con una API key real). Cualquier otro valor es basura
+// heredada de la era VAPI (IDs de voces de Azure tipo "es-MX-DaliaNeural" o
+// IDs crudos de ElevenLabs sin el prefijo "11labs-") — Retell devuelve un 404
+// al crear el agente si se le pasa un voice_id que no reconoce.
+const VALID_VOICE_PREFIXES = ["retell-", "cartesia-", "11labs-", "openai-", "minimax-", "fish_audio-", "inworld-"];
 // Retell no tiene acento argentino — "Mexican" es el más neutro/estándar
 // para español latinoamericano (mismo criterio que ya usaba VAPI con
 // es-MX-DaliaNeural de Azure).
@@ -49,6 +55,11 @@ function resolveLanguage(language: string): NonNullable<Retell.AgentCreateParams
 function resolveVoiceSpeed(speed: number | undefined): number {
   // Rango documentado de Retell: [0.5, 2].
   return Math.min(2, Math.max(0.5, speed ?? 1));
+}
+
+function resolveVoiceId(voiceId: string | undefined): string {
+  if (voiceId && VALID_VOICE_PREFIXES.some((prefix) => voiceId.startsWith(prefix))) return voiceId;
+  return DEFAULT_RETELL_VOICE_ID;
 }
 
 export interface SyncAgentResult {
@@ -107,7 +118,7 @@ export async function syncAgent(): Promise<SyncAgentResult> {
 
   const agentPayload: Retell.AgentCreateParams = {
     response_engine: { type: "retell-llm", llm_id: llmId },
-    voice_id: config.voice.voiceId || DEFAULT_RETELL_VOICE_ID,
+    voice_id: resolveVoiceId(config.voice.voiceId),
     voice_speed: resolveVoiceSpeed(config.voice.speed),
     language: resolveLanguage(config.language),
     agent_name: clinic.name.slice(0, 40),
