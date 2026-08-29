@@ -45,6 +45,14 @@ export async function deleteTableAction(tableId: string): Promise<void> {
   revalidatePath("/mesas");
 }
 
+/** Marca/desmarca una mesa como ocupada a mano (clientes que llegaron sin reservar). */
+export async function toggleTableOccupiedAction(tableId: string, occupied: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("restaurant_tables").update({ is_occupied: occupied }).eq("id", tableId);
+  if (error) throw error;
+  revalidatePath("/mesas");
+}
+
 /** Asigna (o desasigna, con tableId null) una reserva a una mesa específica. */
 export async function assignReservationAction(reservationId: string, tableId: string | null): Promise<void> {
   const supabase = await createClient();

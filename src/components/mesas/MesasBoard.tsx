@@ -1,9 +1,15 @@
 "use client";
 
-import { PlusIcon, TrashIcon, UsersIcon } from "@phosphor-icons/react";
+import { MagnifyingGlassIcon, PlusIcon, TrashIcon, UsersIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { assignReservationAction, deleteTableAction, saveTablesLayoutAction, updateReservationStatusAction } from "@/actions/tables";
+import {
+  assignReservationAction,
+  deleteTableAction,
+  saveTablesLayoutAction,
+  toggleTableOccupiedAction,
+  updateReservationStatusAction,
+} from "@/actions/tables";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/client";
@@ -24,26 +30,37 @@ function formatTime(iso: string, timeZone: string): string {
 function TableBox({
   table,
   editMode,
-  reserved,
+  occupied,
+  reservation,
+  timeZone,
   selectable,
+  highlighted,
   onMove,
   onDelete,
   onClick,
+  boxRef,
 }: {
   table: RestaurantTable;
   editMode: boolean;
-  reserved: boolean;
+  occupied: boolean;
+  reservation: TableReservation | undefined;
+  timeZone: string;
   selectable: boolean;
+  highlighted: boolean;
   onMove: (id: string, x: number, y: number) => void;
   onDelete: (id: string) => void;
   onClick: () => void;
+  boxRef: (el: HTMLDivElement | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
   return (
     <div
-      ref={ref}
+      ref={(el) => {
+        ref.current = el;
+        boxRef(el);
+      }}
       style={{ left: table.pos_x, top: table.pos_y }}
       onPointerDown={(e) => {
         if (!editMode) return;
@@ -60,21 +77,32 @@ function TableBox({
         dragging.current = null;
       }}
       onClick={onClick}
-      className={`absolute flex h-20 w-20 select-none flex-col items-center justify-center rounded-xl border-2 text-xs font-medium ${
+      title={editMode ? undefined : selectable ? "Tocá para asignar la reserva a esta mesa" : "Tocá para marcar ocupada/libre"}
+      className={`absolute flex w-24 select-none flex-col items-center justify-center rounded-xl border-2 px-1 py-2 text-xs font-medium transition-shadow ${
+        reservation ? "min-h-20" : "h-20"
+      } ${
         editMode
           ? "cursor-grab border-border bg-surface active:cursor-grabbing"
-          : reserved
-            ? "border-danger bg-danger/10 text-danger"
+          : occupied
+            ? "cursor-pointer border-danger bg-danger/10 text-danger"
             : selectable
               ? "cursor-pointer border-primary bg-primary/10"
-              : "border-border bg-surface"
-      }`}
+              : "cursor-pointer border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-400"
+      } ${highlighted ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : ""}`}
     >
       <span className="text-base font-bold">#{table.table_number}</span>
       <span className="flex items-center gap-0.5 text-[10px] text-muted">
         <UsersIcon size={10} />
         {table.seats}
       </span>
+      {reservation && (
+        <div className="mt-1 w-full border-t border-danger/30 pt-1 text-center leading-tight">
+          <p className="truncate text-[10px] font-semibold">{reservation.customer_name}</p>
+          <p className="text-[9px] text-danger/80">
+            {reservation.party_size}p · {formatTime(reservation.reservation_time, timeZone)}
+          </p>
+        </div>
+      )}
       {editMode && (
         <button
           type="button"
@@ -108,8 +136,11 @@ export function MesasBoard({
   const [editMode, setEditMode] = useState(false);
   const [editTables, setEditTables] = useState<RestaurantTable[]>(initialTables);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedTableId, setHighlightedTableId] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [, startTransition] = useTransition();
+  const tableBoxRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -132,19 +163,42 @@ export function MesasBoard({
       )
       .subscribe();
 
+    const tablesChannel = supabase
+      .channel(`restaurant_tables_${clinicId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "restaurant_tables", filter: `clinic_id=eq.${clinicId}` },
+        (payload) => {
+          const row = payload.new as RestaurantTable | undefined;
+          if (!row?.id) return;
+          setTables((prev) => prev.map((t) => (t.id === row.id ? row : t)));
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(tablesChannel);
     };
   }, [supabase, clinicId]);
 
   const activeTables = editMode ? editTables : tables;
   const pendingReservations = reservations.filter((r) => r.status === "pendiente");
   const otherReservations = reservations.filter((r) => r.status !== "pendiente");
-  const reservedTableIds = new Set(
-    reservations
-      .filter((r) => r.status === "asignada" && r.table_id && isToday(r.reservation_time, timeZone))
-      .map((r) => r.table_id as string)
+  const todayAssigned = reservations.filter(
+    (r) => r.status === "asignada" && r.table_id && isToday(r.reservation_time, timeZone)
   );
+  const reservedTableIds = new Set(todayAssigned.map((r) => r.table_id as string));
+  const reservationByTableId = new Map(todayAssigned.map((r) => [r.table_id as string, r]));
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const searchResults = trimmedQuery ? reservations.filter((r) => r.customer_name.toLowerCase().includes(trimmedQuery)) : [];
+
+  function handleSelectSearchResult(reservation: TableReservation) {
+    if (!reservation.table_id) return;
+    setHighlightedTableId(reservation.table_id);
+    tableBoxRefs.current.get(reservation.table_id)?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }
 
   function handleEnterEdit() {
     setEditTables(tables);
@@ -164,6 +218,7 @@ export function MesasBoard({
       seats: 2,
       pos_x: 20,
       pos_y: 20,
+      is_occupied: false,
       created_at: new Date().toISOString(),
     };
     setEditTables((prev) => [...prev, newTable]);
@@ -199,15 +254,68 @@ export function MesasBoard({
   }
 
   function handleTableClick(table: RestaurantTable) {
-    if (editMode || !selectedReservationId || reservedTableIds.has(table.id)) return;
+    if (editMode) return;
+    if (selectedReservationId) {
+      if (reservedTableIds.has(table.id) || table.is_occupied) return;
+      startTransition(() => {
+        assignReservationAction(selectedReservationId, table.id);
+      });
+      setSelectedReservationId(null);
+      return;
+    }
+    // Sin una reserva seleccionada, tocar la mesa alterna "ocupada" a mano
+    // (clientes que llegaron sin reservar) — independiente de las reservas.
+    const nextOccupied = !table.is_occupied;
+    setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_occupied: nextOccupied } : t)));
     startTransition(() => {
-      assignReservationAction(selectedReservationId, table.id);
+      toggleTableOccupiedAction(table.id, nextOccupied);
     });
-    setSelectedReservationId(null);
   }
 
   return (
     <div className="space-y-4">
+      <Card className="space-y-2">
+        <h2 className="text-sm font-semibold">Buscar reserva</h2>
+        <div className="relative">
+          <MagnifyingGlassIcon size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por nombre del cliente…"
+            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        {trimmedQuery && (
+          <div className="space-y-1">
+            {searchResults.length === 0 ? (
+              <p className="px-1 text-xs text-muted">Sin resultados para &quot;{searchQuery}&quot;.</p>
+            ) : (
+              searchResults.map((r) => {
+                const table = r.table_id ? tables.find((t) => t.id === r.table_id) : null;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(r)}
+                    disabled={!r.table_id}
+                    className="flex w-full items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs hover:bg-black/5 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-white/5"
+                  >
+                    <span>
+                      <span className="font-medium">{r.customer_name}</span> ({r.party_size}) ·{" "}
+                      {formatTime(r.reservation_time, timeZone)}
+                    </span>
+                    <span className={table ? "font-semibold text-primary" : "text-muted"}>
+                      {table ? `Mesa #${table.table_number}` : r.status === "cancelada" ? "Cancelada" : "Sin mesa asignada"}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </Card>
+
       {pendingReservations.length > 0 && (
         <Card className="space-y-2">
           <h2 className="text-sm font-semibold">Reservas sin mesa asignada</h2>
@@ -256,6 +364,18 @@ export function MesasBoard({
           )}
         </div>
 
+        {!editMode && (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border-2 border-danger bg-danger/10" /> Ocupada / reservada
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border-2 border-sky-500 bg-sky-500/10" /> Libre
+            </span>
+            <span>· Tocá una mesa para marcarla ocupada o liberarla.</span>
+          </div>
+        )}
+
         {activeTables.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted">
             {editMode ? "Tocá \"Agregar mesa\" para empezar a armar tu salón." : "Todavía no configuraste tus mesas."}
@@ -267,11 +387,21 @@ export function MesasBoard({
                 key={table.id}
                 table={table}
                 editMode={editMode}
-                reserved={reservedTableIds.has(table.id)}
-                selectable={!editMode && Boolean(selectedReservationId) && !reservedTableIds.has(table.id)}
+                occupied={reservedTableIds.has(table.id) || table.is_occupied}
+                reservation={reservationByTableId.get(table.id)}
+                timeZone={timeZone}
+                selectable={!editMode && Boolean(selectedReservationId) && !reservedTableIds.has(table.id) && !table.is_occupied}
+                highlighted={highlightedTableId === table.id}
                 onMove={handleMove}
                 onDelete={handleDeleteInEdit}
-                onClick={() => handleTableClick(table)}
+                onClick={() => {
+                  setHighlightedTableId(null);
+                  handleTableClick(table);
+                }}
+                boxRef={(el) => {
+                  if (el) tableBoxRefs.current.set(table.id, el);
+                  else tableBoxRefs.current.delete(table.id);
+                }}
               />
             ))}
           </div>

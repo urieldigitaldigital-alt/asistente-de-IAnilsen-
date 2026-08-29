@@ -297,6 +297,7 @@ export interface Database {
           seats: number;
           pos_x: number;
           pos_y: number;
+          is_occupied: boolean;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["restaurant_tables"]["Row"]> & {
