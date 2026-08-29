@@ -127,13 +127,15 @@ export function formatLocal(date: Date, timeZone: string): string {
 }
 
 /**
- * "00:00" como hora de cierre significa "hasta la medianoche" (fin del mismo
- * día), no el inicio del día — lo tratamos como 24:00 para que la comparación
- * de minutos no dé un horario vacío (confirmado en producción: un negocio
- * "09:00 a 00:00" aparecía SIEMPRE cerrado, porque 0 < cualquier hora del día).
+ * Una hora de cierre igual o menor a la de apertura significa que el negocio
+ * sigue abierto pasada la medianoche (ej. "09:00 a 00:00" = hasta la
+ * medianoche del mismo día, "09:00 a 03:00" = hasta las 3 de la madrugada del
+ * día siguiente) — la corremos +24hs para que la comparación de minutos no dé
+ * un horario vacío o invertido (confirmado en producción con ambos casos: un
+ * negocio "09:00 a 00:00" o "09:00 a 03:00" aparecía SIEMPRE cerrado).
  */
-function normalizedEndHour(endHour: number, endMinute: number): number {
-  return endHour === 0 && endMinute === 0 ? 24 : endHour;
+function normalizedEndMinutes(startMinutes: number, endMinutes: number): number {
+  return endMinutes <= startMinutes ? endMinutes + 24 * 60 : endMinutes;
 }
 
 /** ¿El negocio está abierto ahora mismo según su horario de atención configurado? */
@@ -143,10 +145,11 @@ export function isWithinBusinessHours(businessHours: BusinessHours, timeZone: st
   if (!hours) return false;
 
   const [startHour, startMinute] = hours.start.split(":").map(Number);
-  const [endHourRaw, endMinute] = hours.end.split(":").map(Number);
-  const endHour = normalizedEndHour(endHourRaw, endMinute);
+  const [endHour, endMinute] = hours.end.split(":").map(Number);
+  const startMinutes = startHour * 60 + startMinute;
+  const endMinutes = normalizedEndMinutes(startMinutes, endHour * 60 + endMinute);
   const nowMinutes = parts.hour * 60 + parts.minute;
-  return nowMinutes >= startHour * 60 + startMinute && nowMinutes < endHour * 60 + endMinute;
+  return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
 export interface BusyRange {
@@ -169,8 +172,11 @@ function slotsForDay(dayStart: Date, timeZone: string, businessHours: BusinessHo
   if (!hours) return [];
 
   const [startHour, startMinute] = hours.start.split(":").map(Number);
-  const [endHourRaw, endMinute] = hours.end.split(":").map(Number);
-  const endHour = normalizedEndHour(endHourRaw, endMinute);
+  const [endHourRaw, endMinuteRaw] = hours.end.split(":").map(Number);
+  const startMinutes = startHour * 60 + startMinute;
+  const endMinutesTotal = normalizedEndMinutes(startMinutes, endHourRaw * 60 + endMinuteRaw);
+  const endHour = Math.floor(endMinutesTotal / 60);
+  const endMinute = endMinutesTotal % 60;
 
   const dayOpen = zonedTimeToUtc(parts.year, parts.month, parts.day, startHour, startMinute, timeZone);
   const dayClose = zonedTimeToUtc(parts.year, parts.month, parts.day, endHour, endMinute, timeZone);
