@@ -31,6 +31,20 @@ function todayIsoDate(timeZone: string): string {
   }).format(new Date());
 }
 
+/**
+ * El modelo suele calcular mal "mañana es X" a partir de la fecha de hoy
+ * (confirmado en producción: dijo "abrimos mañana viernes" siendo hoy
+ * viernes) — se lo damos ya resuelto en vez de dejarle la aritmética de días.
+ */
+function todayAndTomorrowLabels(timeZone: string): { today: string; tomorrow: string } {
+  const weekdayKey = new Intl.DateTimeFormat("en-US", { timeZone: resolveTimeZone(timeZone), weekday: "long" })
+    .format(new Date())
+    .toLowerCase();
+  const todayIndex = WEEKDAY_ORDER.indexOf(weekdayKey);
+  const tomorrowIndex = (todayIndex + 1) % WEEKDAY_ORDER.length;
+  return { today: WEEKDAY_LABELS[weekdayKey], tomorrow: WEEKDAY_LABELS[WEEKDAY_ORDER[tomorrowIndex]] };
+}
+
 function formatServices(services: ClinicService[]): string {
   if (services.length === 0) return "- (sin servicios configurados)";
   return services
@@ -193,6 +207,7 @@ export interface OpeningInstruction {
  */
 export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?: OpeningInstruction): string {
   const context = contextSection(clinic, config);
+  const { today, tomorrow } = todayAndTomorrowLabels(clinic.timezone);
 
   const openingHeading = opening ? "## Cómo empezar la conversación" : null;
   const openingBody = opening
@@ -202,7 +217,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?:
   const sections: (string | null)[] = [
     config.system_prompt.trim() || identityDefault(clinic),
     "",
-    `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Usa siempre este año real al calcular cualquier fecha para las tools — nunca un año de otra época.`,
+    `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Hoy es ${today}, mañana es ${tomorrow} — usa siempre estos valores ya calculados al hablar de "hoy"/"mañana", nunca los calcules vos, y usa siempre este año real al calcular cualquier fecha para las tools, nunca un año de otra época.`,
     "",
     openingHeading,
     openingBody,
