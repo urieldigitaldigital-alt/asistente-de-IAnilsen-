@@ -6,7 +6,7 @@ export type WhatsappMessageRole = "customer" | "assistant" | "business";
 export type BusinessType = "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
 export type OrderType = "pickup" | "delivery";
 export type OrderStatus = "recibido" | "en_preparacion" | "listo" | "entregado" | "cancelado";
-export type ReservationStatus = "pendiente" | "asignada" | "cancelada";
+export type ReservationStatus = "pendiente" | "asignada" | "cancelada" | "completada";
 export type PropertyStatus = "disponible" | "reservada" | "vendida";
 export type VisitStatus = "pendiente" | "confirmada" | "cancelada";
 

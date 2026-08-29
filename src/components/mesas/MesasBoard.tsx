@@ -138,6 +138,7 @@ export function MesasBoard({
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedTableId, setHighlightedTableId] = useState<string | null>(null);
+  const [releaseTargetId, setReleaseTargetId] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [, startTransition] = useTransition();
   const tableBoxRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -191,11 +192,14 @@ export function MesasBoard({
   const reservedTableIds = new Set(todayAssigned.map((r) => r.table_id as string));
   const reservationByTableId = new Map(todayAssigned.map((r) => [r.table_id as string, r]));
 
+  const releaseTargetTable = releaseTargetId ? tables.find((t) => t.id === releaseTargetId) : undefined;
+  const releaseTargetReservation = releaseTargetId ? reservationByTableId.get(releaseTargetId) : undefined;
+
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const searchResults = trimmedQuery ? reservations.filter((r) => r.customer_name.toLowerCase().includes(trimmedQuery)) : [];
 
   function handleSelectSearchResult(reservation: TableReservation) {
-    if (!reservation.table_id) return;
+    if (reservation.status !== "asignada" || !reservation.table_id) return;
     setHighlightedTableId(reservation.table_id);
     tableBoxRefs.current.get(reservation.table_id)?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
   }
@@ -263,13 +267,27 @@ export function MesasBoard({
       setSelectedReservationId(null);
       return;
     }
-    // Sin una reserva seleccionada, tocar la mesa alterna "ocupada" a mano
-    // (clientes que llegaron sin reservar) — independiente de las reservas.
+    const activeReservation = reservationByTableId.get(table.id);
+    if (activeReservation) {
+      // Con una reserva activa, pedimos confirmación antes de liberar la
+      // mesa — evita que un toque accidental borre la reserva del cliente.
+      setReleaseTargetId(table.id);
+      return;
+    }
+    // Sin reserva activa, tocar la mesa alterna "ocupada" a mano (clientes
+    // que llegaron sin reservar) — independiente de las reservas.
     const nextOccupied = !table.is_occupied;
     setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_occupied: nextOccupied } : t)));
     startTransition(() => {
       toggleTableOccupiedAction(table.id, nextOccupied);
     });
+  }
+
+  function handleReleaseTable(reservationId: string) {
+    startTransition(() => {
+      updateReservationStatusAction(reservationId, "completada");
+    });
+    setReleaseTargetId(null);
   }
 
   return (
@@ -292,13 +310,13 @@ export function MesasBoard({
               <p className="px-1 text-xs text-muted">Sin resultados para &quot;{searchQuery}&quot;.</p>
             ) : (
               searchResults.map((r) => {
-                const table = r.table_id ? tables.find((t) => t.id === r.table_id) : null;
+                const table = r.status === "asignada" && r.table_id ? tables.find((t) => t.id === r.table_id) : null;
                 return (
                   <button
                     key={r.id}
                     type="button"
                     onClick={() => handleSelectSearchResult(r)}
-                    disabled={!r.table_id}
+                    disabled={!table}
                     className="flex w-full items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs hover:bg-black/5 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-white/5"
                   >
                     <span>
@@ -306,7 +324,13 @@ export function MesasBoard({
                       {formatTime(r.reservation_time, timeZone)}
                     </span>
                     <span className={table ? "font-semibold text-primary" : "text-muted"}>
-                      {table ? `Mesa #${table.table_number}` : r.status === "cancelada" ? "Cancelada" : "Sin mesa asignada"}
+                      {table
+                        ? `Mesa #${table.table_number}`
+                        : r.status === "cancelada"
+                          ? "Cancelada"
+                          : r.status === "completada"
+                            ? "Completada"
+                            : "Sin mesa asignada"}
                     </span>
                   </button>
                 );
@@ -315,6 +339,25 @@ export function MesasBoard({
           </div>
         )}
       </Card>
+
+      {releaseTargetTable && releaseTargetReservation && (
+        <Card className="space-y-2 border-danger/40">
+          <h2 className="text-sm font-semibold">
+            Mesa #{releaseTargetTable.table_number} — {releaseTargetReservation.customer_name}
+          </h2>
+          <p className="text-xs text-muted">
+            {releaseTargetReservation.party_size} personas · reservó para {formatTime(releaseTargetReservation.reservation_time, timeZone)}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => handleReleaseTable(releaseTargetReservation.id)}>
+              Ya pagó / se fue — liberar mesa
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setReleaseTargetId(null)}>
+              Cancelar
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {pendingReservations.length > 0 && (
         <Card className="space-y-2">
@@ -433,6 +476,7 @@ export function MesasBoard({
                 >
                   <option value="pendiente">Pendiente</option>
                   <option value="asignada">Asignada</option>
+                  <option value="completada">Completada</option>
                   <option value="cancelada">Cancelada</option>
                 </select>
               </div>
