@@ -217,7 +217,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?:
   const sections: (string | null)[] = [
     config.system_prompt.trim() || identityDefault(clinic),
     "",
-    `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Hoy es ${today}, mañana es ${tomorrow} — usa siempre estos valores ya calculados al hablar de "hoy"/"mañana", nunca los calcules vos, y usa siempre este año real al calcular cualquier fecha para las tools, nunca un año de otra época.`,
+    `Fecha y hora actuales del negocio: ${formatLocal(new Date(), clinic.timezone)} (${todayIsoDate(clinic.timezone)}). Hoy es ${today}, mañana es ${tomorrow} — usa siempre estos valores ya calculados al hablar de "hoy"/"mañana", nunca los calcules vos, y usa siempre este año real al calcular cualquier fecha para las tools, nunca un año de otra época. Este dato es la verdad absoluta y se recalcula en cada mensaje: si en un mensaje anterior de esta misma conversación dijiste un día, una hora, o si el negocio está abierto/cerrado, y no coincide con esto, ESTABA MAL — corregite de inmediato sin disculparte de más, usá siempre este valor actualizado, y no vuelvas a repetir el dato viejo.`,
     "",
     openingHeading,
     openingBody,
