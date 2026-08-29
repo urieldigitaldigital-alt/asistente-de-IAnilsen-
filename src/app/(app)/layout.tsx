@@ -33,11 +33,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       businessType={businessType}
       initialPendingReservations={pendingReservations}
     >
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen overflow-x-hidden">
         <Sidebar clinicName={clinic?.name ?? "Mi negocio"} businessType={businessType} />
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Topbar userLabel={user.email ?? ""} />
-          <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-20 md:p-6 md:pb-6">{children}</main>
           <MobileNav businessType={businessType} />
         </div>
       </div>
