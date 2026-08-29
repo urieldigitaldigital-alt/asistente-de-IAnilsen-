@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
+import { buildPersonalizedFirstMessage, findReturningCustomerOrderDetails } from "@/lib/vapi/personalization";
 import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
 import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
@@ -100,7 +100,8 @@ export async function sendChatMessage(params: {
   // configurado en Personalización.
   const isFirstMessage = !history || history.length === 0;
   const greeting = isFirstMessage ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
-  const system = buildSystemPrompt(clinic, config, greeting ? { channel: "whatsapp", greeting } : undefined);
+  const returningCustomer = await findReturningCustomerOrderDetails(admin, clinic, customerPhone);
+  const system = buildSystemPrompt(clinic, config, greeting ? { channel: "whatsapp", greeting } : undefined, returningCustomer);
   const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null };
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {

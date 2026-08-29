@@ -1,5 +1,5 @@
 import { formatLocal, isWithinBusinessHours, resolveTimeZone } from "@/lib/availability";
-import type { AgentConfig, BusinessHours, Clinic, ClinicService, MenuItem } from "@/types/database";
+import type { AgentConfig, BusinessHours, Clinic, ClinicService, MenuItem, OrderType } from "@/types/database";
 
 const WEEKDAY_LABELS: Record<string, string> = {
   monday: "Lunes",
@@ -114,6 +114,7 @@ const SHARED_FLOW_CLOSING = [
   "- Sé conciso en cada turno: frases cortas, sin relleno ni repetir información que el cliente ya confirmó. El objetivo es una llamada breve y directa, no una lectura formal.",
   "- Di siempre los números en español, nunca en inglés. Los teléfonos léelos dígito por dígito en español (ej. \"cuatro, uno, cero, uno...\"), nunca como un número completo. Las horas dilas en palabras (\"a las tres de la tarde\"), nunca como \"3:00 PM\" ni en inglés.",
   "- Al pedir el número de teléfono del cliente, nunca te quedes con unos pocos dígitos (por ejemplo, solo el código de área) — seguí preguntando \"¿y los números que siguen?\" hasta tener el número completo (normalmente 10 dígitos en total) antes de repetirlo de vuelta, confirmarlo o llamar a cualquier tool que lo necesite.",
+  "- Variá las palabras y frases que usás entre un turno y otro — no repitas la misma expresión textual dos veces en la conversación (ni saludos, ni confirmaciones, ni despedidas). Sonás natural, no como un guion leído.",
 ].join("\n");
 
 function identityDefault(clinic: Clinic): string {
@@ -193,6 +194,13 @@ export interface OpeningInstruction {
   greeting: string;
 }
 
+/** Datos del último pedido de un cliente recurrente (nombre, forma de entrega, dirección) — ver lib/vapi/personalization.ts. */
+export interface ReturningCustomerOrderDetails {
+  customerName: string;
+  lastOrderType: OrderType;
+  lastDeliveryAddress: string | null;
+}
+
 /**
  * Compone el system prompt final: el texto editable por el dueño en
  * Personalización (identidad, tono, guardrails) + un contexto estructurado
@@ -205,13 +213,26 @@ export interface OpeningInstruction {
  * el asistente abre su respuesta con el saludo y sigue respondiendo lo que
  * haya preguntado.
  */
-export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?: OpeningInstruction): string {
+export function buildSystemPrompt(
+  clinic: Clinic,
+  config: AgentConfig,
+  opening?: OpeningInstruction,
+  returningCustomer?: ReturningCustomerOrderDetails | null
+): string {
   const context = contextSection(clinic, config);
   const { today, tomorrow } = todayAndTomorrowLabels(clinic.timezone);
 
   const openingHeading = opening ? "## Cómo empezar la conversación" : null;
   const openingBody = opening
     ? `Este es el primer mensaje de esta conversación de WhatsApp con este cliente. Abrí tu respuesta con este saludo, palabra por palabra: "${opening.greeting}"\nDespués seguí respondiendo lo que el cliente haya escrito en su mensaje.`
+    : null;
+
+  const returningCustomerNote = returningCustomer
+    ? `\n## Cliente recurrente\nEste cliente ya pidió antes en ${clinic.name}. La vez pasada se llamaba "${returningCustomer.customerName}" y pidió ${
+        returningCustomer.lastOrderType === "delivery" && returningCustomer.lastDeliveryAddress
+          ? `envío a esta dirección: "${returningCustomer.lastDeliveryAddress}"`
+          : "para retirar en el local"
+      }. Cuando esté por confirmar un pedido nuevo (no antes), preguntale si quiere usar los mismos datos de la vez pasada (nombre, dirección/forma de entrega) o prefiere cambiarlos — nunca los des por confirmados sin preguntar. Nunca repitas ni asumas automáticamente los productos de su pedido anterior: tomá siempre un pedido nuevo según lo que pida en esta conversación.`
     : null;
 
   const sections: (string | null)[] = [
@@ -240,6 +261,7 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, opening?:
       ? `\n## Preguntas frecuentes\n${config.clinic_info.faq.map((item) => `- P: ${item.question}\n  R: ${item.answer}`).join("\n")}`
       : null,
     orderAvailabilityNote(clinic, config),
+    returningCustomerNote,
     "",
     "## Flujo de la llamada",
     flowForType(clinic.business_type),

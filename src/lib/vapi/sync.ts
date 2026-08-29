@@ -2,7 +2,7 @@ import type { Vapi } from "@vapi-ai/server-sdk";
 
 import { createClient } from "@/lib/supabase/server";
 import { getTenantVapiClient } from "@/lib/vapi/credentials";
-import { buildFirstMessage, buildSystemPrompt } from "@/lib/vapi/promptBuilder";
+import { buildFirstMessage, buildSystemPrompt, type ReturningCustomerOrderDetails } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
 import type { AgentConfig, Clinic } from "@/types/database";
 
@@ -92,11 +92,16 @@ export interface SyncAssistantResult {
  * (botón "Publicar") como, con un saludo distinto, en la respuesta al evento
  * `assistant-request` (saludo personalizado por llamada).
  */
-export function buildAssistantPayload(clinic: Clinic, config: AgentConfig, greeting: string) {
+export function buildAssistantPayload(
+  clinic: Clinic,
+  config: AgentConfig,
+  greeting: string,
+  returningCustomer?: ReturningCustomerOrderDetails | null
+) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
 
-  const systemPrompt = buildSystemPrompt(clinic, config);
+  const systemPrompt = buildSystemPrompt(clinic, config, undefined, returningCustomer);
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
   return {

@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { constantTimeEqual } from "@/lib/crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildPersonalizedFirstMessage } from "@/lib/vapi/personalization";
-import { buildFirstMessage } from "@/lib/vapi/promptBuilder";
+import { buildPersonalizedFirstMessage, findReturningCustomerOrderDetails } from "@/lib/vapi/personalization";
+import { buildFirstMessage, type ReturningCustomerOrderDetails } from "@/lib/vapi/promptBuilder";
 import { buildAssistantPayload } from "@/lib/vapi/sync";
 import { dispatchToolCall } from "@/lib/vapi/toolHandlers";
 import { vapiWebhookMessageSchema } from "@/lib/validation";
@@ -15,15 +15,29 @@ import { vapiWebhookMessageSchema } from "@/lib/validation";
 // preferimos contestar con el saludo genérico antes que arriesgar ese timeout.
 const GREETING_TIMEOUT_MS = 2500;
 
-async function buildGreetingWithTimeout(
+interface PersonalizationResult {
+  greeting: string;
+  returningCustomer: ReturningCustomerOrderDetails | null;
+}
+
+async function buildPersonalizationWithTimeout(
   admin: ReturnType<typeof createAdminClient>,
   clinic: Parameters<typeof buildPersonalizedFirstMessage>[1],
   config: Parameters<typeof buildPersonalizedFirstMessage>[2],
   customerNumber: string | undefined
-): Promise<string> {
+): Promise<PersonalizationResult> {
   const fallback = buildFirstMessage(config, clinic);
-  const timeout = new Promise<string>((resolve) => setTimeout(() => resolve(fallback), GREETING_TIMEOUT_MS));
-  return Promise.race([buildPersonalizedFirstMessage(admin, clinic, config, customerNumber), timeout]);
+  const timeout = new Promise<PersonalizationResult>((resolve) =>
+    setTimeout(() => resolve({ greeting: fallback, returningCustomer: null }), GREETING_TIMEOUT_MS)
+  );
+  const lookup = (async (): Promise<PersonalizationResult> => {
+    const [greeting, returningCustomer] = await Promise.all([
+      buildPersonalizedFirstMessage(admin, clinic, config, customerNumber),
+      findReturningCustomerOrderDetails(admin, clinic, customerNumber),
+    ]);
+    return { greeting, returningCustomer };
+  })();
+  return Promise.race([lookup, timeout]);
 }
 
 function parseFunctionArguments(args: string | Record<string, unknown> | undefined): Record<string, unknown> {
@@ -83,8 +97,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const greeting = await buildGreetingWithTimeout(admin, clinic, config, message.call?.customer?.number ?? undefined);
-      const assistant = buildAssistantPayload(clinic, config, greeting);
+      const { greeting, returningCustomer } = await buildPersonalizationWithTimeout(
+        admin,
+        clinic,
+        config,
+        message.call?.customer?.number ?? undefined
+      );
+      const assistant = buildAssistantPayload(clinic, config, greeting, returningCustomer);
       return NextResponse.json({ assistant });
     } catch (err) {
       console.error("Error armando el assistant dinámico:", err);

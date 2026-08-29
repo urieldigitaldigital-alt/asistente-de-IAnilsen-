@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { buildFirstMessage } from "@/lib/vapi/promptBuilder";
+import { buildFirstMessage, type ReturningCustomerOrderDetails } from "@/lib/vapi/promptBuilder";
 import type { AgentConfig, Clinic, Database } from "@/types/database";
 
 type AdminClient = SupabaseClient<Database>;
@@ -52,6 +52,45 @@ async function findReturningCustomerName(admin: AdminClient, clinic: Clinic, suf
         .limit(50);
       return (data ?? []).find((row) => phoneSuffix(row.patient_phone) === suffix)?.patient_name ?? null;
     }
+  }
+}
+
+/**
+ * Datos del último pedido de este cliente (nombre, forma de entrega,
+ * dirección) — para que el asistente pueda ofrecer reusarlos en vez de
+ * volver a pedirlos de cero. Solo aplica a pedidos/restaurante; no repite el
+ * pedido en sí, solo los datos de contacto/entrega.
+ */
+export async function findReturningCustomerOrderDetails(
+  admin: AdminClient,
+  clinic: Clinic,
+  customerNumber: string | undefined
+): Promise<ReturningCustomerOrderDetails | null> {
+  if (clinic.business_type !== "pedidos" && clinic.business_type !== "restaurante") return null;
+  if (!customerNumber) return null;
+
+  const suffix = phoneSuffix(customerNumber);
+  if (suffix.length < 6) return null;
+
+  try {
+    const { data } = await admin
+      .from("orders")
+      .select("customer_name, customer_phone, order_type, delivery_address")
+      .eq("clinic_id", clinic.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const lastOrder = (data ?? []).find((row) => phoneSuffix(row.customer_phone) === suffix);
+    if (!lastOrder) return null;
+
+    return {
+      customerName: lastOrder.customer_name,
+      lastOrderType: lastOrder.order_type,
+      lastDeliveryAddress: lastOrder.delivery_address,
+    };
+  } catch (err) {
+    console.error("Error buscando los datos del último pedido del cliente:", err);
+    return null;
   }
 }
 
