@@ -201,6 +201,7 @@ export interface Database {
           session_id: string;
           role: WhatsappMessageRole;
           body: string;
+          wa_message_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Row"]> & {

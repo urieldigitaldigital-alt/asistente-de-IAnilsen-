@@ -58,6 +58,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({});
   }
 
+  // Meta reintenta la entrega del webhook si no respondemos rápido (o en
+  // reentregas duplicadas más raras) — sin este chequeo, un reintento podía
+  // procesar el mismo mensaje dos veces y, si justo era la confirmación de
+  // un pedido, crear dos pedidos idénticos.
+  if (inbound.waMessageId) {
+    const { data: existing } = await admin
+      .from("whatsapp_messages")
+      .select("id")
+      .eq("wa_message_id", inbound.waMessageId)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({});
+    }
+  }
+
   try {
     const conversation = await getOrCreateWhatsappSession({
       clinicId: credentials.clinicId,
@@ -65,12 +80,19 @@ export async function POST(request: NextRequest) {
       admin,
     });
 
-    await logWhatsappMessage(admin, {
+    const { duplicate } = await logWhatsappMessage(admin, {
       clinicId: credentials.clinicId,
       sessionId: conversation.id,
       role: "customer",
       body: inbound.body,
+      waMessageId: inbound.waMessageId,
     });
+    // Última línea de defensa: si dos entregas casi simultáneas del mismo
+    // webhook pasaron el chequeo de arriba antes de que ninguna insertara,
+    // el índice único de wa_message_id hace fallar la segunda acá.
+    if (duplicate) {
+      return NextResponse.json({});
+    }
 
     const reply = await sendChatMessage({
       admin,

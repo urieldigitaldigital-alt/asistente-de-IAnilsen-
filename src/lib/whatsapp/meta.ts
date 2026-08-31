@@ -37,6 +37,8 @@ export interface MetaInboundMessage {
   phoneNumberId: string;
   from: string;
   body: string;
+  /** ID único del mensaje (wamid) — Meta reintenta la entrega del webhook si no responde rápido, así que sirve para no procesar el mismo mensaje dos veces. */
+  waMessageId: string | null;
 }
 
 /** Extrae el primer mensaje de texto entrante de un payload de webhook de la Cloud API de Meta, si lo hay. */
@@ -51,10 +53,12 @@ export function parseMetaWebhookPayload(payload: unknown): MetaInboundMessage | 
     for (const change of changes) {
       const value = (change as { value?: Record<string, unknown> })?.value;
       const phoneNumberId = (value?.metadata as { phone_number_id?: string } | undefined)?.phone_number_id;
-      const messages = value?.messages as Array<{ from?: string; text?: { body?: string }; type?: string }> | undefined;
+      const messages = value?.messages as
+        | Array<{ id?: string; from?: string; text?: { body?: string }; type?: string }>
+        | undefined;
       const message = messages?.[0];
       if (phoneNumberId && message?.from && message.type === "text" && message.text?.body) {
-        return { phoneNumberId, from: message.from, body: message.text.body };
+        return { phoneNumberId, from: message.from, body: message.text.body, waMessageId: message.id ?? null };
       }
     }
   }
