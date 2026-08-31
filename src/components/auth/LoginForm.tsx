@@ -6,6 +6,7 @@ import { useActionState, useEffect } from "react";
 import { login, type AuthFormState } from "@/actions/auth";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
 const initialState: AuthFormState = { error: null };
 
@@ -23,6 +24,7 @@ export function LoginForm({ confirmEmail }: { confirmEmail: boolean }) {
 
   return (
     <form action={formAction} className="space-y-4">
+      {busy && <LoadingOverlay text="Iniciando sesión…" />}
       {confirmEmail && (
         <p className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
           Revisa tu correo para confirmar tu cuenta antes de iniciar sesión.

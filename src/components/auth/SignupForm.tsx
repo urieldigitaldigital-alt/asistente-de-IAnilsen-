@@ -6,6 +6,7 @@ import { useActionState, useEffect, useState } from "react";
 import { signup, type AuthFormState } from "@/actions/auth";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { CUSTOM_TIMEZONE_VALUE, TIMEZONE_OPTIONS } from "@/lib/timezones";
 
 const initialState: AuthFormState = { error: null };
@@ -43,6 +44,7 @@ export function SignupForm() {
 
   return (
     <form action={formAction} className="space-y-4">
+      {busy && <LoadingOverlay text="Creando cuenta…" />}
       {state.error && (
         <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {state.error}
