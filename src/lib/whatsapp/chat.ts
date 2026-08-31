@@ -9,6 +9,11 @@ import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/databa
 
 const MODEL = "claude-haiku-4-5";
 const MAX_TOOL_TURNS = 6;
+// Si pasaron 5+ horas desde el mensaje anterior del cliente, tratamos este
+// mensaje como si fuera el inicio de una conversación nueva (saludo fresco,
+// se vuelve a ofrecer reusar los datos guardados) en vez de seguir el hilo
+// como si no hubiera pasado el tiempo.
+const NEW_DAY_GAP_HOURS = 5;
 
 function getAnthropicClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -81,26 +86,39 @@ export async function sendChatMessage(params: {
   const { admin, clinic, config, sessionId, customerPhone, input } = params;
   const anthropic = getAnthropicClient();
 
-  const { data: history } = await admin
+  // DESC + limit trae los 30 más RECIENTES (no los 30 más viejos); se
+  // revierte después para mandarlos en orden cronológico como espera Claude.
+  const { data: recentDesc } = await admin
     .from("whatsapp_messages")
-    .select("role, body")
+    .select("role, body, created_at")
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(30);
+  const history = (recentDesc ?? []).slice().reverse();
 
-  const messages: Anthropic.MessageParam[] = (history ?? []).map((m) => ({
+  // El mensaje actual del cliente ya se guardó en whatsapp_messages antes de
+  // llamar a esta función (ver api/whatsapp/webhook/route.ts), así que ya es
+  // el último elemento de `history` — evita mandarlo duplicado a Claude.
+  const lastEntry = history[history.length - 1];
+  const currentAlreadyInHistory = lastEntry?.role === "customer" && lastEntry.body === input;
+  const priorHistory = currentAlreadyInHistory ? history.slice(0, -1) : history;
+
+  const messages: Anthropic.MessageParam[] = priorHistory.map((m) => ({
     role: m.role === "customer" ? "user" : "assistant",
     content: m.body,
   }));
   messages.push({ role: "user", content: input });
 
   const tools = buildClaudeTools(clinic.business_type);
-  // Primer mensaje de la conversación (sin historial previo): usa el mismo
+  const lastPriorMessageAt = priorHistory[priorHistory.length - 1]?.created_at;
+  const hoursSinceLastMessage = lastPriorMessageAt ? (Date.now() - new Date(lastPriorMessageAt).getTime()) / 3_600_000 : Infinity;
+  // Conversación nueva o retomada después de un rato largo: usa el mismo
   // saludo de bienvenida/personalizado a cliente recurrente que las llamadas,
-  // configurado en Personalización.
-  const isFirstMessage = !history || history.length === 0;
-  const greeting = isFirstMessage ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
-  const returningCustomer = await findReturningCustomerOrderDetails(admin, clinic, customerPhone);
+  // configurado en Personalización, y recién ahí vuelve a ofrecer reusar los
+  // datos guardados de un pedido anterior.
+  const isNewDay = priorHistory.length === 0 || hoursSinceLastMessage >= NEW_DAY_GAP_HOURS;
+  const greeting = isNewDay ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
+  const returningCustomer = isNewDay ? await findReturningCustomerOrderDetails(admin, clinic, customerPhone) : null;
   const system = buildSystemPrompt(clinic, config, {
     opening: greeting ? { channel: "whatsapp", greeting } : undefined,
     returningCustomer,
