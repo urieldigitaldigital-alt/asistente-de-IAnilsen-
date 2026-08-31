@@ -101,7 +101,7 @@ export function buildAssistantPayload(
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret) throw new Error("VAPI_WEBHOOK_SECRET no está configurada.");
 
-  const systemPrompt = buildSystemPrompt(clinic, config, undefined, returningCustomer);
+  const systemPrompt = buildSystemPrompt(clinic, config, { returningCustomer, channel: "voice" });
   const tools = buildAssistantTools({ receptionPhoneNumber: clinic.phone || undefined, businessType: clinic.business_type });
 
   return {

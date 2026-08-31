@@ -101,7 +101,11 @@ export async function sendChatMessage(params: {
   const isFirstMessage = !history || history.length === 0;
   const greeting = isFirstMessage ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
   const returningCustomer = await findReturningCustomerOrderDetails(admin, clinic, customerPhone);
-  const system = buildSystemPrompt(clinic, config, greeting ? { channel: "whatsapp", greeting } : undefined, returningCustomer);
+  const system = buildSystemPrompt(clinic, config, {
+    opening: greeting ? { channel: "whatsapp", greeting } : undefined,
+    returningCustomer,
+    channel: "whatsapp",
+  });
   const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null };
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {

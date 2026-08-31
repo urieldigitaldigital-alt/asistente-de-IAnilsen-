@@ -109,12 +109,29 @@ const LLAMADAS_FLOW = [
   "6. Si es urgente o pide hablar con una persona ya mismo, usá la transferencia a recepción o registrá un handoff.",
 ].join("\n");
 
-const SHARED_FLOW_CLOSING = [
-  "- En cuanto el cliente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despídete brevemente en una sola frase y de inmediato llama a la tool endCall para colgar la llamada. No sigas hablando después de despedirte.",
-  "- Sé conciso en cada turno: frases cortas, sin relleno ni repetir información que el cliente ya confirmó. El objetivo es una llamada breve y directa, no una lectura formal.",
-  "- Di siempre los números en español, nunca en inglés. Los teléfonos léelos dígito por dígito en español (ej. \"cuatro, uno, cero, uno...\"), nunca como un número completo. Las horas dilas en palabras (\"a las tres de la tarde\"), nunca como \"3:00 PM\" ni en inglés.",
+const SHARED_FLOW_CLOSING_BASE = [
+  "- Sé conciso en cada turno: frases cortas, sin relleno ni repetir información que el cliente ya confirmó. El objetivo es una conversación breve y directa, no una lectura formal.",
   "- Al pedir el número de teléfono del cliente, nunca te quedes con unos pocos dígitos (por ejemplo, solo el código de área) — seguí preguntando \"¿y los números que siguen?\" hasta tener el número completo (normalmente 10 dígitos en total) antes de repetirlo de vuelta, confirmarlo o llamar a cualquier tool que lo necesite.",
   "- Variá las palabras y frases que usás entre un turno y otro — no repitas la misma expresión textual dos veces en la conversación (ni saludos, ni confirmaciones, ni despedidas). Sonás natural, no como un guion leído.",
+];
+
+// Instrucción estricta e innegociable: la síntesis de voz a veces lee una
+// cifra suelta ("4108") con acento/idioma inglés aunque el resto de la frase
+// esté en español. Deletrear cada dígito como palabra evita ese problema de
+// raíz (no hay cifra que la voz pueda malinterpretar).
+const VOICE_FLOW_CLOSING = [
+  "- En cuanto el cliente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despídete brevemente en una sola frase y de inmediato llama a la tool endCall para colgar la llamada. No sigas hablando después de despedirte.",
+  ...SHARED_FLOW_CLOSING_BASE,
+  "- Decí siempre los números en voz alta en español, nunca en inglés — instrucción estricta, sin excepciones. Los teléfonos leélos dígito por dígito, cada uno como palabra en español (ej. \"cuatro, uno, cero, uno...\"), nunca como cifra completa ni en inglés (\"four one zero one\"). Las horas decilas en palabras en español (\"a las tres de la tarde\"), nunca como \"3:00 PM\" ni en inglés.",
+].join("\n");
+
+// En WhatsApp es al revés: como es texto (no hay síntesis de voz), un
+// teléfono deletreado con letras ("cuatro uno cero ocho...") se lee raro —
+// se espera la cifra tal cual, como escribiría cualquier persona.
+const WHATSAPP_FLOW_CLOSING = [
+  "- En cuanto el cliente se despida (diga 'chau', 'gracias', 'nada más', 'hasta luego' o similar) y no tenga más preguntas pendientes, despedite brevemente en una sola frase y no sigas escribiendo después — no existe ninguna tool para \"colgar\", simplemente dejá de responder.",
+  ...SHARED_FLOW_CLOSING_BASE,
+  "- Escribí los números siempre con cifras (dígitos), nunca deletreados con letras — instrucción estricta, sin excepciones. Un teléfono se escribe \"1123456789\", nunca \"uno, uno, dos, tres...\". Las horas también con números (\"15:00\" o \"3 de la tarde\"), no hace falta deletrearlas letra por letra como en una llamada.",
 ].join("\n");
 
 function identityDefault(clinic: Clinic): string {
@@ -201,24 +218,28 @@ export interface ReturningCustomerOrderDetails {
   lastDeliveryAddress: string | null;
 }
 
+export interface BuildSystemPromptOptions {
+  /** Si se pasa (WhatsApp), agrega la instrucción de saludo inicial: el cliente ya escribió (es su primer mensaje de la conversación), así que el asistente abre su respuesta con el saludo y sigue respondiendo lo que haya preguntado. */
+  opening?: OpeningInstruction;
+  returningCustomer?: ReturningCustomerOrderDetails | null;
+  /**
+   * Determina qué instrucciones de formato de números/cierre de conversación
+   * usar: en llamadas los números se deletrean como palabras (para que la
+   * síntesis de voz los lea en español, nunca en inglés); en WhatsApp se
+   * escriben con cifras normales, como escribiría cualquier persona.
+   */
+  channel?: "voice" | "whatsapp";
+}
+
 /**
  * Compone el system prompt final: el texto editable por el dueño en
  * Personalización (identidad, tono, guardrails) + un contexto estructurado
  * generado a partir de los datos del negocio, siempre sincronizado — la
  * misma función para llamadas y WhatsApp, así cualquier cambio en
  * Personalización se refleja en los dos canales.
- *
- * `opening`, si se pasa (WhatsApp), agrega la instrucción de saludo inicial:
- * el cliente ya escribió (es su primer mensaje de la conversación), así que
- * el asistente abre su respuesta con el saludo y sigue respondiendo lo que
- * haya preguntado.
  */
-export function buildSystemPrompt(
-  clinic: Clinic,
-  config: AgentConfig,
-  opening?: OpeningInstruction,
-  returningCustomer?: ReturningCustomerOrderDetails | null
-): string {
+export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, options: BuildSystemPromptOptions = {}): string {
+  const { opening, returningCustomer, channel = "voice" } = options;
   const context = contextSection(clinic, config);
   const { today, tomorrow } = todayAndTomorrowLabels(clinic.timezone);
 
@@ -263,9 +284,9 @@ export function buildSystemPrompt(
     orderAvailabilityNote(clinic, config),
     returningCustomerNote,
     "",
-    "## Flujo de la llamada",
+    "## Flujo de la conversación",
     flowForType(clinic.business_type),
-    SHARED_FLOW_CLOSING,
+    channel === "whatsapp" ? WHATSAPP_FLOW_CLOSING : VOICE_FLOW_CLOSING,
     "",
     `Idioma de la conversación: ${config.language === "es" ? "español" : config.language}. Tono: ${config.tone}.`,
   ];
