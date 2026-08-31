@@ -252,11 +252,11 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, options: 
     : null;
 
   const returningCustomerNote = returningCustomer
-    ? `\n## Cliente recurrente\nEste cliente ya pidió antes en ${clinic.name}. La vez pasada se llamaba "${returningCustomer.customerName}" y pidió ${
+    ? `\n## Cliente recurrente\nEste cliente ya pidió antes en ${clinic.name}. Tenés guardados sus DATOS de la vez pasada — nombre: "${returningCustomer.customerName}", forma de entrega: ${
         returningCustomer.lastOrderType === "delivery" && returningCustomer.lastDeliveryAddress
-          ? `envío a esta dirección: "${returningCustomer.lastDeliveryAddress}"`
-          : "para retirar en el local"
-      }. Cuando esté por confirmar un pedido nuevo (no antes), preguntale si quiere usar los mismos datos de la vez pasada (nombre, dirección/forma de entrega) o prefiere cambiarlos — nunca los des por confirmados sin preguntar. Nunca repitas ni asumas automáticamente los productos de su pedido anterior: tomá siempre un pedido nuevo según lo que pida en esta conversación.`
+          ? `envío a "${returningCustomer.lastDeliveryAddress}"`
+          : "retiro en el local"
+      } — pero NUNCA su pedido anterior (qué productos pidió): eso no lo sabés, no lo tenés, y no debés mencionarlo ni insinuarlo bajo ningún concepto. Cuando el cliente esté por hacer un pedido nuevo (no antes, no de arranque), preguntale primero si querés que le repitas los datos guardados para confirmar que están bien (por ejemplo: "¿querés que te diga los datos que tengo guardados para ver si están bien, o preferís pasarlos de nuevo?") — recién si dice que sí, decíselos y preguntá si los mantiene o los cambia; si dice que no, pedíselos de cero como a cualquier cliente nuevo. Nunca des los datos por confirmados sin preguntar antes. El pedido en sí siempre es nuevo: tomá siempre lo que pida en esta conversación, nunca repitas ni asumas productos de una vez anterior.`
     : null;
 
   const sections: (string | null)[] = [
