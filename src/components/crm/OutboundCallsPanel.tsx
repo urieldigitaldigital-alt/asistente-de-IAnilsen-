@@ -3,12 +3,14 @@
 import { CheckCircleIcon, PhoneOutgoingIcon } from "@phosphor-icons/react";
 import { useActionState } from "react";
 
-import { initialOutboundCallsState, launchOutboundCallsAction } from "@/actions/outboundCalls";
+import { launchOutboundCallsAction, type LaunchOutboundCallsState } from "@/actions/outboundCalls";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
+const idleState: LaunchOutboundCallsState = { campaignId: null, leadsCalled: 0, error: null };
+
 export function OutboundCallsPanel() {
-  const [state, formAction, pending] = useActionState(launchOutboundCallsAction, initialOutboundCallsState);
+  const [state, formAction, pending] = useActionState(launchOutboundCallsAction, idleState);
 
   return (
     <Card className="space-y-3">

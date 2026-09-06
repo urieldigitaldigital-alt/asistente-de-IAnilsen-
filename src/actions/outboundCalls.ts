@@ -46,8 +46,6 @@ function parseLeadsInput(raw: string): { leads: ParsedLead[]; invalidLines: stri
   return { leads, invalidLines };
 }
 
-export const initialOutboundCallsState: LaunchOutboundCallsState = { campaignId: null, leadsCalled: 0, error: null };
-
 /**
  * Lanza una campaña de llamadas salientes de VAPI a una lista de números
  * pegados a mano en el panel (leads/clientes propios del negocio, nunca
