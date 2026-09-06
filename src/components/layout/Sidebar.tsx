@@ -2,6 +2,7 @@
 
 import {
   CalendarBlankIcon,
+  ChartLineUpIcon,
   ChatCircleTextIcon,
   ForkKnifeIcon,
   GearSixIcon,
@@ -36,7 +37,10 @@ function getDomainNavItems(businessType: BusinessType) {
       return [];
     case "citas":
     default:
-      return [{ href: "/calendario", label: "Calendario", icon: CalendarBlankIcon }];
+      return [
+        { href: "/calendario", label: "Calendario", icon: CalendarBlankIcon },
+        { href: "/crm", label: "CRM", icon: ChartLineUpIcon },
+      ];
   }
 }
 

@@ -225,6 +225,7 @@ export interface Database {
           summary: string | null;
           cost: number | null;
           recording_url: string | null;
+          direction: "inbound" | "outbound";
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["calls"]["Row"]> & {

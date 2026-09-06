@@ -145,10 +145,11 @@ export async function POST(request: NextRequest) {
 
   let callRowId: string | null = null;
   if (vapiCallId) {
+    const direction = message.call?.type === "outboundPhoneCall" ? "outbound" : "inbound";
     const { data: callRow } = await admin
       .from("calls")
       .upsert(
-        { clinic_id: clinic.id, vapi_call_id: vapiCallId, phone_number: customerNumber },
+        { clinic_id: clinic.id, vapi_call_id: vapiCallId, phone_number: customerNumber, direction },
         { onConflict: "vapi_call_id" }
       )
       .select("id")

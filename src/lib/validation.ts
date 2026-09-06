@@ -235,6 +235,8 @@ export const vapiWebhookMessageSchema = z.object({
         id: z.string().nullish(),
         phoneNumberId: z.string().nullish(),
         assistantId: z.string().nullish(),
+        // "inboundPhoneCall" | "outboundPhoneCall" (también hay "webCall") — para distinguir dirección en el panel de CRM.
+        type: z.string().nullish(),
         customer: z.object({ number: z.string().nullish() }).nullish(),
         // Presente en el evento assistant-request (todavía no existe `id`/`phoneNumberId` planos en esa etapa).
         phoneNumber: z.object({ id: z.string().nullish(), number: z.string().nullish() }).nullish(),
