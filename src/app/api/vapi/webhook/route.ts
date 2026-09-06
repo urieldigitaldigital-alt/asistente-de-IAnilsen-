@@ -7,6 +7,43 @@ import { buildFirstMessage, type ReturningCustomerOrderDetails } from "@/lib/vap
 import { buildAssistantPayload } from "@/lib/vapi/sync";
 import { dispatchToolCall } from "@/lib/vapi/toolHandlers";
 import { vapiWebhookMessageSchema } from "@/lib/validation";
+import { getOrCreateWhatsappSession } from "@/lib/whatsapp/chat";
+import { getOwnWhatsappCredentials } from "@/lib/whatsapp/credentials";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/meta";
+import { logWhatsappMessage } from "@/lib/whatsapp/messages";
+import type { Clinic } from "@/types/database";
+
+// Motivos de fin de llamada que significan "no atendió nadie" — a diferencia
+// de que el cliente cortó tras hablar. Solo aplica a llamadas salientes
+// (campaña de CRM): si no contestan, mandamos un WhatsApp de respaldo en vez
+// de dejar la llamada perdida sin ningún seguimiento.
+const NO_ANSWER_ENDED_REASONS = new Set(["customer-did-not-answer", "customer-busy", "voicemail"]);
+
+/** Nunca debe romper el procesamiento del webhook si el envío falla. */
+async function notifyMissedOutboundCallByWhatsApp(
+  admin: ReturnType<typeof createAdminClient>,
+  clinic: Clinic,
+  customerNumber: string
+): Promise<void> {
+  try {
+    const credentials = await getOwnWhatsappCredentials(clinic.id, admin);
+    if (!credentials) return;
+
+    const body = `¡Hola! Te llamamos de ${clinic.name} pero no pudimos comunicarnos. Escribinos por acá cuando puedas 🙂`;
+
+    await sendWhatsAppMessage({
+      phoneNumberId: credentials.metaPhoneNumberId,
+      accessToken: credentials.metaAccessToken,
+      to: customerNumber,
+      body,
+    });
+
+    const session = await getOrCreateWhatsappSession({ clinicId: clinic.id, customerPhone: customerNumber, admin });
+    await logWhatsappMessage(admin, { clinicId: clinic.id, sessionId: session.id, role: "business", body });
+  } catch (err) {
+    console.error("No se pudo avisar por WhatsApp tras una llamada saliente sin respuesta:", err);
+  }
+}
 
 // VAPI exige responder assistant-request en 7.5s totales (incluye el viaje de
 // red) o la llamada falla con "assistant-request-returned-error" — confirmado
@@ -177,6 +214,11 @@ export async function POST(request: NextRequest) {
     }
 
     case "end-of-call-report": {
+      const direction = message.call?.type === "outboundPhoneCall" ? "outbound" : "inbound";
+      if (direction === "outbound" && customerNumber && message.endedReason && NO_ANSWER_ENDED_REASONS.has(message.endedReason)) {
+        await notifyMissedOutboundCallByWhatsApp(admin, clinic, customerNumber);
+      }
+
       if (vapiCallId) {
         await admin
           .from("calls")
