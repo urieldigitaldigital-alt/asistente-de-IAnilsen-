@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 
+import { OutboundCallsPanel } from "@/components/crm/OutboundCallsPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatTile } from "@/components/ui/StatTile";
 import { Card } from "@/components/ui/Card";
@@ -60,6 +61,8 @@ export default async function CrmPage() {
         <StatTile icon={PhoneOutgoingIcon} label="Llamadas salientes" value={String(data.callsOutbound)} />
         <StatTile icon={CalendarCheckIcon} label="Reuniones agendadas" value={String(data.meetingsScheduled)} />
       </div>
+
+      <OutboundCallsPanel />
 
       <Card>
         <h2 className="mb-4 text-sm font-semibold">Leads y reuniones</h2>
