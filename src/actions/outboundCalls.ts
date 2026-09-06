@@ -7,6 +7,10 @@ import { launchOutboundCallCampaign } from "@/lib/vapi/calls";
 import { friendlyVapiError } from "@/lib/vapi/friendlyError";
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+// Encuentra un número "suelto" en la línea aunque tenga espacios o guiones
+// adentro (ej. "+54 9 2254 597287") — se normaliza después sacando esos
+// separadores, no exige que el usuario lo escriba ya en formato E.164 puro.
+const PHONE_TOKEN_REGEX = /\+\d[\d\s-]{4,20}\d/;
 const MAX_LEADS_PER_BATCH = 200;
 
 export interface LaunchOutboundCallsState {
@@ -20,7 +24,9 @@ interface ParsedLead {
   phone: string;
 }
 
-// Cada línea: "+5491122334455" o "Nombre, +5491122334455" (nombre opcional, en cualquier orden).
+// Cada línea puede tener el nombre en cualquier lado, con o sin coma: "+5491122334455",
+// "Nombre, +5491122334455", "+5491122334455 Nombre" — se acepta lo que sobre de la línea
+// después de sacar el número como nombre.
 function parseLeadsInput(raw: string): { leads: ParsedLead[]; invalidLines: string[] } {
   const leads: ParsedLead[] = [];
   const invalidLines: string[] = [];
@@ -30,16 +36,16 @@ function parseLeadsInput(raw: string): { leads: ParsedLead[]; invalidLines: stri
     const line = rawLine.trim();
     if (!line) continue;
 
-    const parts = line.split(",").map((p) => p.trim()).filter(Boolean);
-    const phone = parts.find((p) => E164_PHONE_REGEX.test(p));
-    if (!phone) {
+    const match = line.match(PHONE_TOKEN_REGEX);
+    const phone = match ? match[0].replace(/[\s-]/g, "") : null;
+    if (!phone || !E164_PHONE_REGEX.test(phone)) {
       invalidLines.push(line);
       continue;
     }
     if (seenPhones.has(phone)) continue;
     seenPhones.add(phone);
 
-    const name = parts.filter((p) => p !== phone).join(" ");
+    const name = line.replace(match![0], "").replace(/,/g, " ").replace(/\s+/g, " ").trim();
     leads.push({ name, phone });
   }
 
