@@ -291,6 +291,94 @@ export async function importTwilioNumber(params: TwilioImportParams): Promise<Pr
   return { phoneNumberId: phoneNumber.id, number: "number" in phoneNumber ? (phoneNumber.number ?? null) : null };
 }
 
+export interface ZadarmaImportParams {
+  number: string;
+  sipUsername: string;
+  sipPassword: string;
+}
+
+// Confirmado con la guía oficial de integración Zadarma↔VAPI
+// (zadarma.com/en/support/instructions/vapiai): el host de la troncal SIP de
+// Zadarma es pbx.zadarma.com, con auth por usuario/contraseña de la
+// extensión (no por IP fija).
+const ZADARMA_SIP_HOST = "pbx.zadarma.com";
+
+/**
+ * Importa un número de Zadarma como troncal SIP propia (BYO SIP trunk) y lo
+ * vincula al assistant — mismo patrón que importTwilioNumber. La API de
+ * VAPI para crear la credencial de troncal (`POST /credential`, provider
+ * "byo-sip-trunk") todavía no está envuelta en el SDK de servidor (no existe
+ * un recurso `credentials` en @vapi-ai/server-sdk), así que se llama con
+ * `vapi.fetch()` — el passthrough autenticado del propio SDK para
+ * endpoints sin wrapper — en vez de hacer fetch manual con la API key.
+ * La contraseña SIP de Zadarma no se guarda en nuestra base: se reenvía
+ * directo a VAPI. A propósito NO se fija un `assistantId` en el número (ver
+ * provisionVapiNumber/importTwilioNumber): el número debe quedar sin
+ * assistant fijo para que `assistant-request` arme el saludo personalizado
+ * en cada llamada — fijarlo reproduciría el bug de "asistente congelado" ya
+ * visto antes con números configurados a mano desde el dashboard de VAPI.
+ */
+export async function importZadarmaNumber(params: ZadarmaImportParams): Promise<ProvisionedPhoneNumber> {
+  const supabase = await createClient();
+
+  const { data: clinic, error: clinicError } = await supabase.from("clinics").select("*").single();
+  if (clinicError || !clinic) throw new Error("No se encontró el negocio del usuario.");
+
+  const { data: config, error: configError } = await supabase
+    .from("agent_configs")
+    .select("clinic_id, vapi_assistant_id")
+    .eq("clinic_id", clinic.id)
+    .single();
+  if (configError || !config) throw new Error("No se encontró la configuración del agente.");
+  if (!config.vapi_assistant_id) {
+    throw new Error("Publica el asistente antes de importar un número.");
+  }
+
+  const vapi = await getTenantVapiClient(clinic.id, supabase);
+
+  // vapi.fetch() resuelve rutas relativas contra `_options.baseUrl`/`environment`,
+  // pero getVapiClient() solo pasa `token` (sin environment) — con una ruta
+  // relativa tira "Failed to parse URL from /credential". Se evita del todo
+  // pasando la URL absoluta (confirmado contra el código fuente del SDK:
+  // dist/cjs/core/fetcher/makePassthroughRequest.js usa la URL tal cual si
+  // ya empieza con "http").
+  const credentialResponse = await vapi.fetch("https://api.vapi.ai/credential", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "byo-sip-trunk",
+      name: `Zadarma — ${clinic.name.slice(0, 30)}`,
+      gateways: [{ ip: ZADARMA_SIP_HOST, inboundEnabled: false }],
+      outboundLeadingPlusEnabled: true,
+      outboundAuthenticationPlan: {
+        authUsername: params.sipUsername,
+        authPassword: params.sipPassword,
+      },
+    }),
+  });
+  if (!credentialResponse.ok) {
+    const body = await credentialResponse.text().catch(() => "");
+    throw new Error(`Status code: ${credentialResponse.status} Body: ${body}`);
+  }
+  const credential = (await credentialResponse.json()) as { id: string };
+
+  const phoneNumber = await vapi.phoneNumbers.create({
+    provider: "byo-phone-number",
+    number: params.number,
+    credentialId: credential.id,
+    name: clinic.name.slice(0, 40),
+    server: buildNumberServer(),
+  });
+
+  const { error: updateError } = await supabase
+    .from("agent_configs")
+    .update({ vapi_phone_number_id: phoneNumber.id })
+    .eq("clinic_id", clinic.id);
+  if (updateError) throw updateError;
+
+  return { phoneNumberId: phoneNumber.id, number: "number" in phoneNumber ? (phoneNumber.number ?? null) : null };
+}
+
 /** Vincula un número de VAPI (ya creado por el dueño en el dashboard, ej. un número propio importado) al assistant publicado de la clínica. */
 export async function linkPhoneNumber(phoneNumberId: string): Promise<void> {
   const supabase = await createClient();

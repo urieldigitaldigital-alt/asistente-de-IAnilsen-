@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { saveVapiApiKey } from "@/lib/vapi/credentials";
 import { friendlyVapiError } from "@/lib/vapi/friendlyError";
-import { importTwilioNumber, linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
-import { twilioImportFormSchema, vapiApiKeyFormSchema, vapiPhoneNumberFormSchema } from "@/lib/validation";
+import { importTwilioNumber, importZadarmaNumber, linkPhoneNumber, provisionVapiNumber, syncAssistant } from "@/lib/vapi/sync";
+import { twilioImportFormSchema, vapiApiKeyFormSchema, vapiPhoneNumberFormSchema, zadarmaImportFormSchema } from "@/lib/validation";
 
 export interface VapiActionState {
   error: string | null;
@@ -96,6 +96,34 @@ export async function importTwilioNumberAction(
     // No loguear `err` completo: el mensaje de VAPI podría incluir el auth token.
     console.error("Error importando número de Twilio a VAPI.");
     return { error: friendlyVapiError(err, "No se pudo importar el número de Twilio."), success: null };
+  }
+}
+
+export async function importZadarmaNumberAction(
+  _prevState: VapiActionState,
+  formData: FormData
+): Promise<VapiActionState> {
+  const parsed = zadarmaImportFormSchema.safeParse({
+    number: formData.get("number"),
+    sipUsername: formData.get("sipUsername"),
+    sipPassword: formData.get("sipPassword"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos de Zadarma inválidos.", success: null };
+  }
+
+  try {
+    const result = await importZadarmaNumber(parsed.data);
+    revalidatePath("/integraciones");
+    revalidatePath("/dashboard");
+    return {
+      error: null,
+      success: result.number ? `Número de Zadarma importado: ${result.number}` : "Número de Zadarma importado y vinculado.",
+    };
+  } catch (err) {
+    // No loguear `err` completo: el mensaje de VAPI podría incluir la contraseña SIP.
+    console.error("Error importando número de Zadarma a VAPI.");
+    return { error: friendlyVapiError(err, "No se pudo importar el número de Zadarma."), success: null };
   }
 }
 

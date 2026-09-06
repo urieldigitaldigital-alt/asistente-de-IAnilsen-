@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 
 import {
   importTwilioNumberAction,
+  importZadarmaNumberAction,
   linkPhoneNumberAction,
   provisionVapiNumberAction,
   publishAssistantAction,
@@ -29,9 +30,11 @@ export function VapiNumberCard({
 }) {
   const [provisionState, provisionAction, provisionPending] = useActionState(provisionVapiNumberAction, idleState);
   const [twilioState, twilioAction, twilioPending] = useActionState(importTwilioNumberAction, idleState);
+  const [zadarmaState, zadarmaAction, zadarmaPending] = useActionState(importZadarmaNumberAction, idleState);
   const [linkState, linkAction, linkPending] = useActionState(linkPhoneNumberAction, idleState);
   const [publishState, publishAction, publishPending] = useActionState(publishAssistantAction, idleState);
   const [showTwilio, setShowTwilio] = useState(false);
+  const [showZadarma, setShowZadarma] = useState(false);
   const [showRawUuid, setShowRawUuid] = useState(false);
 
   return (
@@ -134,6 +137,45 @@ export function VapiNumberCard({
               </a>{" "}
               y copiá estos 3 datos desde la Consola de Twilio (Account SID y Auth Token están en la página principal). No
               guardamos el Auth Token — se envía directo a VAPI para activar el número.
+            </p>
+          </form>
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowZadarma((v) => !v)}
+          className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
+        >
+          <CaretDownIcon size={12} className={`transition-transform ${showZadarma ? "rotate-180" : ""}`} />
+          Importar un número de Zadarma (troncal SIP propia)
+        </button>
+        {showZadarma && (
+          <form action={zadarmaAction} className="mt-2 space-y-2">
+            <div>
+              <Label htmlFor="zadarmaNumber">Número virtual (formato internacional)</Label>
+              <Input id="zadarmaNumber" name="number" placeholder="+5491122334455" required />
+            </div>
+            <div>
+              <Label htmlFor="sipUsername">Usuario/extensión SIP de Zadarma</Label>
+              <Input id="sipUsername" name="sipUsername" placeholder="1234-100" autoComplete="off" required />
+            </div>
+            <div>
+              <Label htmlFor="sipPassword">Contraseña SIP de Zadarma</Label>
+              <Input id="sipPassword" name="sipPassword" type="password" autoComplete="off" required />
+            </div>
+            <Button type="submit" variant="secondary" disabled={zadarmaPending || !assistantId || !vapiConnected} className="w-full">
+              {zadarmaPending ? "Importando…" : "Importar y vincular"}
+            </Button>
+            {zadarmaState.error && <p className="text-sm text-danger">{zadarmaState.error}</p>}
+            {zadarmaState.success && <p className="text-sm text-primary">{zadarmaState.success}</p>}
+            <p className="text-xs text-muted">
+              En tu cuenta de Zadarma: el número virtual está en &quot;Mis números&quot;; el usuario y la contraseña SIP están
+              en &quot;PBX virtual → Extensiones&quot; (formato de usuario tipo <code>1234-100</code>). No guardamos la
+              contraseña SIP — se envía directo a VAPI para crear la troncal. Después, en Zadarma tenés que configurar el
+              reenvío de esa extensión a &quot;Servidor externo (SIP URI)&quot; con la dirección{" "}
+              <code>tu_numero@sip.vapi.ai</code> para que las llamadas entrantes también lleguen al asistente.
             </p>
           </form>
         )}
