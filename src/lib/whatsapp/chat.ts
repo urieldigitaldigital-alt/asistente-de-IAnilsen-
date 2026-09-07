@@ -7,7 +7,11 @@ import { buildAssistantTools } from "@/lib/vapi/tools";
 import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
 import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/database";
 
-const MODEL = "claude-haiku-4-5";
+// Haiku 4.5 confirmaba citas/pedidos por texto ("listo, quedó agendado") sin
+// haber llamado nunca al tool correspondiente — el cliente se iba creyendo
+// que quedó todo listo y nunca se guardaba nada. Sonnet respeta mucho mejor
+// la regla de "nunca confirmes sin llamar al tool" (ver promptBuilder.ts).
+const MODEL = "claude-sonnet-5";
 const MAX_TOOL_TURNS = 6;
 // Si pasaron 5+ horas desde el mensaje anterior del cliente, tratamos este
 // mensaje como si fuera el inicio de una conversación nueva (saludo fresco,

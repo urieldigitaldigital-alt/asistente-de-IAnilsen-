@@ -137,6 +137,16 @@ const WHATSAPP_FLOW_CLOSING = [
   "- Escribí los números siempre con cifras (dígitos), nunca deletreados con letras — instrucción estricta, sin excepciones. Un teléfono se escribe \"1123456789\", nunca \"uno, uno, dos, tres...\". Las horas también con números (\"15:00\" o \"3 de la tarde\"), no hace falta deletrearlas letra por letra como en una llamada.",
 ].join("\n");
 
+// Última instrucción del prompt a propósito (lo último que lee el modelo
+// antes de generar pesa más) — confirmado en producción que el modelo decía
+// "listo, quedó agendado/registrado" en texto plano, sin haber llamado nunca
+// al tool, dejando al cliente creyendo que existe algo que nunca se guardó.
+const TOOL_CALL_GUARDRAIL = [
+  "## Regla crítica sobre confirmar citas, pedidos o reservas",
+  'Cuando el cliente confirme los datos (diga "sí" a tu resumen), tu única acción en ese turno tiene que ser LLAMAR al tool correspondiente (bookAppointment, createOrder, reserveTable, scheduleVisit, cancelAppointment) — no generes ninguna frase de confirmación todavía. Solo después de recibir la respuesta del tool en el siguiente turno podés decirle al cliente que quedó listo, y basándote en lo que ese tool te haya devuelto (si devolvió un error, contale el error, no digas que quedó confirmado).',
+  "Nunca, bajo ninguna circunstancia, escribas \"listo\", \"quedó agendado/registrado/confirmado\" o cualquier frase equivalente en el mismo turno en el que decidís llamar al tool, ni tampoco si directamente no lo llamaste. Si tenés dudas sobre si ya lo llamaste en este intercambio, es que no lo llamaste — llamalo ahora.",
+].join("\n");
+
 function identityDefault(clinic: Clinic): string {
   switch (clinic.business_type) {
     case "pedidos":
@@ -292,6 +302,8 @@ export function buildSystemPrompt(clinic: Clinic, config: AgentConfig, options: 
     channel === "whatsapp" ? WHATSAPP_FLOW_CLOSING : VOICE_FLOW_CLOSING,
     "",
     `Idioma de la conversación: ${config.language === "es" ? "español" : config.language}. Tono: ${config.tone}.`,
+    "",
+    TOOL_CALL_GUARDRAIL,
   ];
 
   return sections.filter((line): line is string => line !== null).join("\n");
