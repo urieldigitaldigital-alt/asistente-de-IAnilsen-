@@ -1,5 +1,6 @@
 "use server";
 
+import { sendPushToClinic } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PushSubscriptionInput {
@@ -28,4 +29,24 @@ export async function subscribeToPushAction(input: PushSubscriptionInput): Promi
 export async function unsubscribeFromPushAction(endpoint: string): Promise<void> {
   const supabase = await createClient();
   await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+}
+
+/** Manda una notificación push de prueba a todos los dispositivos suscriptos del negocio, para verificar que llegan. */
+export async function sendTestPushAction(): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { data: clinic } = await supabase.from("clinics").select("id").single();
+  if (!clinic) return { error: "No se encontró el negocio." };
+
+  const { count } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinic.id);
+  if (!count) return { error: "Todavía no activaste las notificaciones en este dispositivo." };
+
+  await sendPushToClinic(supabase, clinic.id, {
+    title: "Notificación de prueba",
+    body: "Si ves esto, las notificaciones están funcionando correctamente.",
+    url: "/crm",
+  });
+  return { error: null };
 }

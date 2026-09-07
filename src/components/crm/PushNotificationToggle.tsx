@@ -3,7 +3,7 @@
 import { BellIcon, BellRingingIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
-import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push";
+import { sendTestPushAction, subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push";
 import { Button } from "@/components/ui/Button";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -29,6 +29,7 @@ function getInitialStatus(): Status {
 export function PushNotificationToggle() {
   const [status, setStatus] = useState<Status>(getInitialStatus);
   const [pending, setPending] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (status !== "checking") return;
@@ -76,6 +77,17 @@ export function PushNotificationToggle() {
     }
   }
 
+  async function handleTest() {
+    setPending(true);
+    setTestResult(null);
+    try {
+      const { error } = await sendTestPushAction();
+      setTestResult(error ?? "Notificación enviada — revisá tu celular o el navegador.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function handleDeactivate() {
     setPending(true);
     try {
@@ -104,10 +116,18 @@ export function PushNotificationToggle() {
 
   if (status === "on") {
     return (
-      <Button type="button" variant="secondary" onClick={handleDeactivate} disabled={pending} className="text-xs">
-        <BellRingingIcon size={16} weight="fill" className="text-primary" />
-        Notificaciones activadas
-      </Button>
+      <div className="flex flex-col items-end gap-1.5">
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="secondary" onClick={handleTest} disabled={pending} className="text-xs">
+            Enviar notificación de prueba
+          </Button>
+          <Button type="button" variant="secondary" onClick={handleDeactivate} disabled={pending} className="text-xs">
+            <BellRingingIcon size={16} weight="fill" className="text-primary" />
+            Notificaciones activadas
+          </Button>
+        </div>
+        {testResult && <p className="text-xs text-muted">{testResult}</p>}
+      </div>
     );
   }
 
