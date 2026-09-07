@@ -52,6 +52,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [maxAppointmentsPerDay, setMaxAppointmentsPerDay] = useState(
     config.max_appointments_per_day != null ? String(config.max_appointments_per_day) : ""
   );
+  const [ownerNotificationPhone, setOwnerNotificationPhone] = useState(config.owner_notification_phone ?? "");
 
   const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
   const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
@@ -77,6 +78,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         first_message: firstMessage,
         handoff_message: handoffMessage,
         max_appointments_per_day: maxAppointmentsPerDay.trim() === "" ? null : Number(maxAppointmentsPerDay),
+        owner_notification_phone: ownerNotificationPhone.trim() === "" ? null : ownerNotificationPhone.trim(),
       }),
     [
       systemPrompt,
@@ -95,6 +97,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       firstMessage,
       handoffMessage,
       maxAppointmentsPerDay,
+      ownerNotificationPhone,
     ]
   );
 
@@ -159,6 +162,27 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
               placeholder="Sin límite"
               value={maxAppointmentsPerDay}
               onChange={(e) => setMaxAppointmentsPerDay(e.target.value)}
+            />
+          </div>
+        </Card>
+      )}
+
+      {businessType === "citas" && (
+        <Card className="space-y-2">
+          <h2 className="text-sm font-semibold">Avisos de nuevas citas por WhatsApp</h2>
+          <p className="text-sm text-muted">
+            Además de la notificación push del navegador, te podemos avisar por WhatsApp al instante cada vez que se
+            agende una cita — es más confiable para que te llegue al celular. Completá tu número con código de país
+            (ej. +5491122334455) o dejalo vacío para no recibir este aviso.
+          </p>
+          <div className="max-w-xs">
+            <Label htmlFor="owner_notification_phone">Tu WhatsApp</Label>
+            <Input
+              id="owner_notification_phone"
+              type="tel"
+              placeholder="+5491122334455"
+              value={ownerNotificationPhone}
+              onChange={(e) => setOwnerNotificationPhone(e.target.value)}
             />
           </div>
         </Card>

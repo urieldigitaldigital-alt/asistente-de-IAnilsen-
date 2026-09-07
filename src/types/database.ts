@@ -117,6 +117,7 @@ export interface Database {
           vapi_assistant_id: string | null;
           vapi_phone_number_id: string | null;
           max_appointments_per_day: number | null;
+          owner_notification_phone: string | null;
           updated_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["agent_configs"]["Row"]> & {

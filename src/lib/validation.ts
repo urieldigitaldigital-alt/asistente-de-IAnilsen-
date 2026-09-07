@@ -158,6 +158,13 @@ export const agentConfigFormSchema = z.object({
   first_message: z.string(),
   handoff_message: z.string().optional(),
   max_appointments_per_day: z.number().int().min(1).max(100).nullable().optional(),
+  owner_notification_phone: z
+    .string()
+    .nullable()
+    .optional()
+    .refine((value) => !value || E164_PHONE_REGEX.test(value), {
+      message: "El WhatsApp para avisos debe tener formato internacional (ej. +5491122334455).",
+    }),
 });
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;

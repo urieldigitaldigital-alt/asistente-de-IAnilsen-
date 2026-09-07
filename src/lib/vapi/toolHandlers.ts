@@ -11,6 +11,8 @@ import {
 } from "@/lib/availability";
 import { deleteCalendarEvent, getFreeBusy, insertCalendarEvent } from "@/lib/google/calendar";
 import { sendPushToClinic } from "@/lib/push";
+import { getOwnWhatsappCredentials } from "@/lib/whatsapp/credentials";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/meta";
 import {
   bookAppointmentSchema,
   cancelAppointmentSchema,
@@ -52,6 +54,29 @@ function assumeFutureIntent(date: Date, now: Date): Date {
     guard += 1;
   }
   return candidate;
+}
+
+/**
+ * Aviso por WhatsApp al dueño del negocio (no al cliente) de que se agendó
+ * una cita nueva — más confiable que el push del navegador para que llegue
+ * al instante al celular. Requiere que el negocio tenga WhatsApp conectado y
+ * haya cargado su propio número en Personalización; si no, no hace nada.
+ */
+async function notifyOwnerByWhatsApp(ctx: ToolHandlerContext, body: string): Promise<void> {
+  const ownerPhone = ctx.config.owner_notification_phone;
+  if (!ownerPhone) return;
+  try {
+    const credentials = await getOwnWhatsappCredentials(ctx.clinic.id, ctx.admin);
+    if (!credentials) return;
+    await sendWhatsAppMessage({
+      phoneNumberId: credentials.metaPhoneNumberId,
+      accessToken: credentials.metaAccessToken,
+      to: ownerPhone,
+      body,
+    });
+  } catch (err) {
+    console.error("No se pudo avisar por WhatsApp al dueño del negocio:", err);
+  }
 }
 
 function findServiceDuration(config: AgentConfig, treatment?: string): number {
@@ -213,11 +238,14 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
   // Awaited (no fire-and-forget): en un entorno serverless la función puede
   // cortarse apenas se devuelve la respuesta, matando cualquier promesa
   // todavía pendiente — así que hay que esperarla antes de retornar.
+  const localWhen = formatLocal(start, ctx.clinic.timezone);
   await sendPushToClinic(ctx.admin, ctx.clinic.id, {
     title: "Nueva llamada agendada",
-    body: `${data.patientName} — ${data.treatment} — ${formatLocal(start, ctx.clinic.timezone)}`,
+    body: `${data.patientName} — ${data.treatment} — ${localWhen}`,
     url: "/crm",
   }).catch((err) => console.error("No se pudo enviar la notificación push de la nueva cita:", err));
+
+  await notifyOwnerByWhatsApp(ctx, `📅 Nueva cita agendada: ${data.patientName} — ${data.treatment} — ${localWhen}.`);
 
   return JSON.stringify({
     booked: true,
