@@ -165,6 +165,20 @@ function dayHoursFor(businessHours: BusinessHours, weekday: WeekdayKey): DayHour
   return businessHours[weekday] ?? null;
 }
 
+/** Clave "YYYY-MM-DD" del día calendario de `date` en la timezone del negocio — para agrupar/topear citas por día. */
+export function localDateKey(date: Date, timeZone: string): string {
+  const parts = getZonedParts(date, resolveTimeZone(timeZone));
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+/** Rango UTC [00:00, 24:00) del día calendario de `date` en la timezone del negocio. */
+export function localDayBoundsUtc(date: Date, timeZone: string): { start: Date; end: Date } {
+  const parts = getZonedParts(date, resolveTimeZone(timeZone));
+  const start = zonedTimeToUtc(parts.year, parts.month, parts.day, 0, 0, timeZone);
+  const nextMidnight = zonedTimeToUtc(parts.year, parts.month, parts.day, 23, 59, timeZone);
+  return { start, end: new Date(nextMidnight.getTime() + 60_000) };
+}
+
 /** Genera los slots de SLOT_MINUTES dentro del horario de atención de un día concreto, en UTC. */
 function slotsForDay(dayStart: Date, timeZone: string, businessHours: BusinessHours, durationMinutes: number): Date[] {
   const parts = getZonedParts(dayStart, timeZone);
@@ -204,6 +218,10 @@ export interface FindAvailabilityParams {
   daysAhead?: number;
   maxAlternatives?: number;
   now?: Date;
+  /** Tope de citas por día calendario (ej. el dueño solo puede atender 5 llamadas/día) — sin esto, sin límite. */
+  maxPerDay?: number;
+  /** Cantidad de citas ya agendadas por día (clave = localDateKey), para saltear días que ya llegaron al tope. */
+  bookedCountByDate?: Map<string, number>;
 }
 
 export interface AvailabilityAlternative {
@@ -231,9 +249,15 @@ export function findAvailability(params: FindAvailabilityParams): AvailabilityRe
     daysAhead = 14,
     maxAlternatives = 3,
     now = new Date(),
+    maxPerDay,
+    bookedCountByDate,
   } = params;
 
-  const requestedAvailable = requestedStart ? isSlotFree(requestedStart, durationMinutes, busy) : false;
+  const isDayFull = (day: Date): boolean =>
+    maxPerDay != null && (bookedCountByDate?.get(localDateKey(day, timeZone)) ?? 0) >= maxPerDay;
+
+  const requestedAvailable =
+    requestedStart && !isDayFull(requestedStart) ? isSlotFree(requestedStart, durationMinutes, busy) : false;
   if (requestedStart && requestedAvailable) {
     return { requestedAvailable: true, alternatives: [] };
   }
@@ -243,6 +267,7 @@ export function findAvailability(params: FindAvailabilityParams): AvailabilityRe
 
   for (let dayOffset = 0; dayOffset < daysAhead && alternatives.length < maxAlternatives; dayOffset++) {
     const dayCursor = new Date(searchStart.getTime() + dayOffset * 24 * 60 * 60_000);
+    if (isDayFull(dayCursor)) continue;
     const slots = slotsForDay(dayCursor, timeZone, businessHours, durationMinutes);
 
     for (const slot of slots) {

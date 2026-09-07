@@ -1,6 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { findAvailability, formatLocal, isWithinBusinessHours, parseLocalDateTime, type BusyRange } from "@/lib/availability";
+import {
+  findAvailability,
+  formatLocal,
+  isWithinBusinessHours,
+  localDateKey,
+  localDayBoundsUtc,
+  parseLocalDateTime,
+  type BusyRange,
+} from "@/lib/availability";
 import { deleteCalendarEvent, getFreeBusy, insertCalendarEvent } from "@/lib/google/calendar";
 import {
   bookAppointmentSchema,
@@ -65,6 +73,23 @@ async function getScheduledLocalBusy(ctx: ToolHandlerContext, from: Date, to: Da
   return (data ?? []).map((row) => ({ start: new Date(row.start_time), end: new Date(row.end_time) }));
 }
 
+async function getScheduledCountByLocalDate(ctx: ToolHandlerContext, from: Date, to: Date): Promise<Map<string, number>> {
+  const { data } = await ctx.admin
+    .from("appointments")
+    .select("start_time")
+    .eq("clinic_id", ctx.clinic.id)
+    .eq("status", "scheduled")
+    .gte("start_time", from.toISOString())
+    .lte("start_time", to.toISOString());
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const key = localDateKey(new Date(row.start_time), ctx.clinic.timezone);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
 async function handleCheckAvailability(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
   const parsed = checkAvailabilitySchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -79,9 +104,10 @@ async function handleCheckAvailability(ctx: ToolHandlerContext, rawArgs: unknown
     : undefined;
   const windowEnd = new Date(now.getTime() + (daysAhead ?? 14) * 24 * 60 * 60_000);
 
-  const [googleBusy, localBusy] = await Promise.all([
+  const [googleBusy, localBusy, bookedCountByDate] = await Promise.all([
     getFreeBusy(ctx.admin, ctx.clinic.id, now, windowEnd),
     getScheduledLocalBusy(ctx, now, windowEnd),
+    ctx.config.max_appointments_per_day ? getScheduledCountByLocalDate(ctx, now, windowEnd) : Promise.resolve(undefined),
   ]);
 
   const result = findAvailability({
@@ -92,6 +118,8 @@ async function handleCheckAvailability(ctx: ToolHandlerContext, rawArgs: unknown
     busy: [...googleBusy, ...localBusy],
     daysAhead: daysAhead ?? 14,
     now,
+    maxPerDay: ctx.config.max_appointments_per_day ?? undefined,
+    bookedCountByDate,
   });
 
   if (result.requestedAvailable && requestedStart) {
@@ -113,6 +141,20 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
   const data = parsed.data;
   const start = assumeFutureIntent(parseLocalDateTime(data.datetime, ctx.clinic.timezone), new Date());
   const end = new Date(start.getTime() + data.durationMinutes * 60_000);
+
+  if (ctx.config.max_appointments_per_day) {
+    const { start: dayStart, end: dayEnd } = localDayBoundsUtc(start, ctx.clinic.timezone);
+    const { count } = await ctx.admin
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", ctx.clinic.id)
+      .eq("status", "scheduled")
+      .gte("start_time", dayStart.toISOString())
+      .lt("start_time", dayEnd.toISOString());
+    if ((count ?? 0) >= ctx.config.max_appointments_per_day) {
+      return "Ese día ya tengo la agenda completa. ¿Probamos con otro día?";
+    }
+  }
 
   let googleEventId: string | null = null;
   let googleEventLink: string | null = null;

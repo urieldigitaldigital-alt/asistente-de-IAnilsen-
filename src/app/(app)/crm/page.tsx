@@ -74,12 +74,13 @@ export default async function CrmPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted">
                   <th className="pb-2 pr-4 font-medium">Nombre</th>
                   <th className="pb-2 pr-4 font-medium">Teléfono</th>
                   <th className="pb-2 pr-4 font-medium">Servicio de interés</th>
+                  <th className="pb-2 pr-4 font-medium">Qué busca / detalle</th>
                   <th className="pb-2 pr-4 font-medium">Reunión</th>
                   <th className="pb-2 font-medium">Estado</th>
                 </tr>
@@ -90,6 +91,9 @@ export default async function CrmPage() {
                     <td className="py-2 pr-4 font-medium">{lead.name}</td>
                     <td className="py-2 pr-4 text-muted">{lead.phone}</td>
                     <td className="py-2 pr-4">{lead.service}</td>
+                    <td className="max-w-[260px] py-2 pr-4 text-muted" title={lead.notes ?? undefined}>
+                      <span className="line-clamp-2">{lead.notes || "—"}</span>
+                    </td>
                     <td className="py-2 pr-4 text-muted">{formatDateTime(lead.startTime, timeZone)}</td>
                     <td className="py-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[lead.status]}`}>
