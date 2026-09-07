@@ -82,11 +82,11 @@ export default async function CrmPage() {
       <OutboundCallsPanel />
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold">Leads y reuniones</h2>
+        <h2 className="mb-4 text-sm font-semibold">Todas las agendas y reservas</h2>
         {data.leads.length === 0 ? (
           <EmptyState
             icon={UsersThreeIcon}
-            title="Todavía no hay leads registrados"
+            title="Todavía no hay agendas registradas"
             description="En cuanto alguien agende una reunión por llamada o WhatsApp, va a aparecer acá."
           />
         ) : (

@@ -32,7 +32,7 @@ export async function getCrmData(supabase: SupabaseClient<Database>): Promise<Cr
       .from("appointments")
       .select("id, patient_name, patient_phone, treatment, start_time, status, notes")
       .order("start_time", { ascending: false })
-      .limit(50),
+      .limit(300),
   ]);
 
   const appointments = appointmentsRes.data ?? [];

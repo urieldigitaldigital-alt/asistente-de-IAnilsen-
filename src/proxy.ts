@@ -51,9 +51,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // .js excluido a propósito: sw.js (service worker de las notificaciones
-  // push) tiene que servirse siempre igual, sin pasar por el redirect a
-  // /login — confirmado con curl sin cookie de sesión que sin esto devolvía
-  // 307 en vez del script.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp|js)$).*)"],
+  // .js y manifest.webmanifest excluidos a propósito: sw.js (service worker
+  // de las notificaciones push) y el manifest de la PWA los pide el
+  // navegador (o iOS, al evaluar si se puede instalar en la pantalla de
+  // inicio) sin cookie de sesión — confirmado con curl que sin esto
+  // devolvían 307 a /login en vez del archivo.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|js)$).*)"],
 };

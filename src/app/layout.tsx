@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 
@@ -17,6 +17,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Asistente Nilsen IA",
   description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+  icons: { apple: "/logo.png" },
+  // "apple-mobile-web-app-capable": Safari solo permite notificaciones push
+  // cuando el sitio se instaló como app desde "Compartir → Agregar a inicio"
+  // — desde una pestaña normal, el permiso de notificaciones se ignora.
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Nilsen IA" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f766e",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
