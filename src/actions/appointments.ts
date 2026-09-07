@@ -26,5 +26,17 @@ export async function cancelAppointmentAction(appointmentId: string): Promise<{ 
 
   revalidatePath("/calendario");
   revalidatePath("/dashboard");
+  revalidatePath("/crm");
+  return { error: null };
+}
+
+/** Marca una cita/reunión como ya realizada — para hacer seguimiento de leads en el panel de CRM. */
+export async function completeAppointmentAction(appointmentId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("appointments").update({ status: "completed" }).eq("id", appointmentId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/calendario");
+  revalidatePath("/crm");
   return { error: null };
 }

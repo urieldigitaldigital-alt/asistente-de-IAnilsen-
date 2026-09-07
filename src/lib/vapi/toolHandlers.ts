@@ -10,6 +10,7 @@ import {
   type BusyRange,
 } from "@/lib/availability";
 import { deleteCalendarEvent, getFreeBusy, insertCalendarEvent } from "@/lib/google/calendar";
+import { sendPushToClinic } from "@/lib/push";
 import {
   bookAppointmentSchema,
   cancelAppointmentSchema,
@@ -208,6 +209,15 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
     console.error("Error al guardar la cita:", error);
     return "No pude guardar la cita, intentemos de nuevo en un momento.";
   }
+
+  // Awaited (no fire-and-forget): en un entorno serverless la función puede
+  // cortarse apenas se devuelve la respuesta, matando cualquier promesa
+  // todavía pendiente — así que hay que esperarla antes de retornar.
+  await sendPushToClinic(ctx.admin, ctx.clinic.id, {
+    title: "Nueva llamada agendada",
+    body: `${data.patientName} — ${data.treatment} — ${formatLocal(start, ctx.clinic.timezone)}`,
+    url: "/crm",
+  }).catch((err) => console.error("No se pudo enviar la notificación push de la nueva cita:", err));
 
   return JSON.stringify({
     booked: true,
