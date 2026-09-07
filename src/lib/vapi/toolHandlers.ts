@@ -105,7 +105,15 @@ async function handleCheckAvailability(ctx: ToolHandlerContext, rawArgs: unknown
   const windowEnd = new Date(now.getTime() + (daysAhead ?? 14) * 24 * 60 * 60_000);
 
   const [googleBusy, localBusy, bookedCountByDate] = await Promise.all([
-    getFreeBusy(ctx.admin, ctx.clinic.id, now, windowEnd),
+    // Si Google Calendar falla (token vencido, revocado, etc.) no puede tirar
+    // abajo la disponibilidad entera — seguimos solo con lo que ya sabemos en
+    // nuestra propia base (getScheduledLocalBusy), que es la fuente de verdad
+    // de todos modos. Confirmado en producción: un invalid_grant acá dejaba
+    // el checkAvailability completo inutilizable y ningún cliente podía agendar.
+    getFreeBusy(ctx.admin, ctx.clinic.id, now, windowEnd).catch((err: unknown) => {
+      console.error("No se pudo leer Google Calendar, sigo solo con las citas propias:", err);
+      return [] as BusyRange[];
+    }),
     getScheduledLocalBusy(ctx, now, windowEnd),
     ctx.config.max_appointments_per_day ? getScheduledCountByLocalDate(ctx, now, windowEnd) : Promise.resolve(undefined),
   ]);
