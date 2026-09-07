@@ -37,13 +37,26 @@ export async function getCrmData(supabase: SupabaseClient<Database>): Promise<Cr
 
   const appointments = appointmentsRes.data ?? [];
 
+  // Orden "profesional" de pipeline: lo agendado (próximo primero) arriba de
+  // todo, después lo ya realizado, y lo cancelado al final — en vez de una
+  // sola fecha descendente, que mezclaba todo y dejaba pruebas canceladas
+  // viejas arriba de leads reales.
+  const STATUS_PRIORITY: Record<AppointmentStatus, number> = { scheduled: 0, completed: 1, cancelled: 2 };
+  const sorted = [...appointments].sort((a, b) => {
+    const priorityDiff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
+    if (priorityDiff !== 0) return priorityDiff;
+    const aTime = new Date(a.start_time).getTime();
+    const bTime = new Date(b.start_time).getTime();
+    return a.status === "scheduled" ? aTime - bTime : bTime - aTime;
+  });
+
   return {
     messagesSent: messagesSentRes.count ?? 0,
     messagesReceived: messagesReceivedRes.count ?? 0,
     callsInbound: callsInboundRes.count ?? 0,
     callsOutbound: callsOutboundRes.count ?? 0,
-    meetingsScheduled: appointments.length,
-    leads: appointments.map((a) => ({
+    meetingsScheduled: appointments.filter((a) => a.status === "scheduled").length,
+    leads: sorted.map((a) => ({
       id: a.id,
       name: a.patient_name,
       phone: a.patient_phone,

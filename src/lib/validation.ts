@@ -157,6 +157,7 @@ export const agentConfigFormSchema = z.object({
   model: z.object({ provider: z.string(), model: z.string() }),
   first_message: z.string(),
   handoff_message: z.string().optional(),
+  max_appointments_per_day: z.number().int().min(1).max(100).nullable().optional(),
 });
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;

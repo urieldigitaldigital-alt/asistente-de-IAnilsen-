@@ -11,6 +11,8 @@ import { SandboxChat } from "@/components/customize/SandboxChat";
 import { ServicesEditor } from "@/components/customize/ServicesEditor";
 import { VoiceLanguageSelect } from "@/components/customize/VoiceLanguageSelect";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input, Label } from "@/components/ui/Input";
 import type { AgentConfig, BusinessHours, BusinessType, Clinic, ClinicService, MenuItem } from "@/types/database";
 
 const idleState: AgentConfigActionState = { error: null, success: null };
@@ -47,6 +49,9 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
   const [services, setServices] = useState<ClinicService[]>(config.services);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(config.menu_items ?? []);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(config.business_hours);
+  const [maxAppointmentsPerDay, setMaxAppointmentsPerDay] = useState(
+    config.max_appointments_per_day != null ? String(config.max_appointments_per_day) : ""
+  );
 
   const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
   const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
@@ -71,6 +76,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         model: { provider: "openai", model: modelName },
         first_message: firstMessage,
         handoff_message: handoffMessage,
+        max_appointments_per_day: maxAppointmentsPerDay.trim() === "" ? null : Number(maxAppointmentsPerDay),
       }),
     [
       systemPrompt,
@@ -88,6 +94,7 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       modelName,
       firstMessage,
       handoffMessage,
+      maxAppointmentsPerDay,
     ]
   );
 
@@ -133,6 +140,30 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       ) : businessType === "citas" ? (
         <ServicesEditor services={services} onChange={setServices} />
       ) : null}
+
+      {businessType === "citas" && (
+        <Card className="space-y-2">
+          <h2 className="text-sm font-semibold">Tope de citas por día</h2>
+          <p className="text-sm text-muted">
+            Si lo completás, el asistente no va a agendar más de esta cantidad de llamadas/citas el mismo día — va a
+            ofrecer repartirlas en distintos horarios y, si el día ya está completo, va a sugerir otra fecha. Dejalo
+            vacío para no limitar.
+          </p>
+          <div className="max-w-40">
+            <Label htmlFor="max_appointments_per_day">Máximo por día</Label>
+            <Input
+              id="max_appointments_per_day"
+              type="number"
+              min={1}
+              max={100}
+              placeholder="Sin límite"
+              value={maxAppointmentsPerDay}
+              onChange={(e) => setMaxAppointmentsPerDay(e.target.value)}
+            />
+          </div>
+        </Card>
+      )}
+
       <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
       <VoiceLanguageSelect
         voiceProvider={voiceProvider}
