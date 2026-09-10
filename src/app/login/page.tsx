@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
+import { AuthShell } from "@/components/auth/AuthShell";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { Card } from "@/components/ui/Card";
 
 export const metadata: Metadata = { title: "Iniciar sesión — Asistente Nilsen IA" };
 
@@ -13,14 +13,8 @@ export default async function LoginPage({
   const { message } = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-center text-2xl font-semibold">Asistente Nilsen IA</h1>
-        <p className="mb-6 text-center text-sm text-muted">Ingresa al panel de tu negocio</p>
-        <Card>
-          <LoginForm confirmEmail={message === "confirm-email"} />
-        </Card>
-      </div>
-    </div>
+    <AuthShell title="Asistente Nilsen IA" subtitle="Ingresa al panel de tu negocio">
+      <LoginForm confirmEmail={message === "confirm-email"} />
+    </AuthShell>
   );
 }

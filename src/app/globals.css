@@ -9,6 +9,7 @@
   --primary-foreground: #ffffff;
   --muted: #64748b;
   --danger: #dc2626;
+  --grid-dot: rgba(17, 24, 39, 0.06);
 }
 
 @theme inline {
@@ -33,6 +34,7 @@
     --primary: #4c8dff;
     --primary-foreground: #ffffff;
     --muted: #8b96a3;
+    --grid-dot: rgba(238, 242, 247, 0.07);
   }
 }
 
@@ -64,6 +66,77 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     opacity: 1;
+    animation: none;
+  }
+}
+
+/* Fondo animado de las pantallas de acceso (login/signup): dos manchas de
+   luz azul desplazándose despacio detrás de una grilla de puntos sutil. */
+@keyframes aurora-drift-a {
+  0%,
+  100% {
+    transform: translate(-8%, -6%) scale(1);
+  }
+  50% {
+    transform: translate(6%, 4%) scale(1.15);
+  }
+}
+
+@keyframes aurora-drift-b {
+  0%,
+  100% {
+    transform: translate(8%, 6%) scale(1.1);
+  }
+  50% {
+    transform: translate(-6%, -8%) scale(1);
+  }
+}
+
+.auth-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.auth-aurora::before,
+.auth-aurora::after {
+  content: "";
+  position: absolute;
+  width: min(60vw, 640px);
+  height: min(60vw, 640px);
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.45;
+  will-change: transform;
+}
+
+.auth-aurora::before {
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle, var(--primary), transparent 70%);
+  animation: aurora-drift-a 20s ease-in-out infinite;
+}
+
+.auth-aurora::after {
+  bottom: -14%;
+  right: -10%;
+  background: radial-gradient(circle, #1e3a8a, transparent 70%);
+  animation: aurora-drift-b 24s ease-in-out infinite;
+}
+
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 80%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-aurora::before,
+  .auth-aurora::after {
     animation: none;
   }
 }
