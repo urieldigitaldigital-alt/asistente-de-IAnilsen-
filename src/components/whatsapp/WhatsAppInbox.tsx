@@ -41,7 +41,7 @@ function Avatar({ label, size = "md" }: { label: string; size?: "sm" | "md" }) {
   const dimensions = size === "sm" ? "h-9 w-9 text-sm" : "h-10 w-10 text-base";
   return (
     <div
-      className={`flex ${dimensions} shrink-0 items-center justify-center rounded-full bg-[#0f766e] font-semibold text-white dark:bg-[#2dd4bf] dark:text-[#0b1120]`}
+      className={`flex ${dimensions} shrink-0 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground`}
     >
       {initialOf(label)}
     </div>
