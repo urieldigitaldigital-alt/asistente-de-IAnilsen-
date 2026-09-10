@@ -52,10 +52,13 @@ export function WhatsAppInbox({
   clinicId,
   timeZone,
   initialConversations,
+  isNewPatientBySession = {},
 }: {
   clinicId: string;
   timeZone: string;
   initialConversations: WhatsappSession[];
+  /** Si la conversación ya tuvo una cita agendada, si el cliente se identificó como nuevo o no — para diferenciar cada contacto en el listado. */
+  isNewPatientBySession?: Record<string, boolean>;
 }) {
   const [conversations, setConversations] = useState<WhatsappSession[]>(initialConversations);
   const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id ?? null);
@@ -179,6 +182,7 @@ export function WhatsAppInbox({
           const config = STATUS_CONFIG[conversation.status];
           const active = conversation.id === selectedId;
           const label = conversation.customer_name || conversation.customer_phone;
+          const isNewPatient = isNewPatientBySession[conversation.id];
           return (
             <button
               key={conversation.id}
@@ -194,7 +198,14 @@ export function WhatsAppInbox({
                   <span className="truncate font-medium">{label}</span>
                   <span className="shrink-0 text-xs text-muted">{formatTime(conversation.last_message_at, timeZone)}</span>
                 </div>
-                <Badge tone={config.tone}>{config.label}</Badge>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone={config.tone}>{config.label}</Badge>
+                  {isNewPatient !== undefined && (
+                    <Badge tone={isNewPatient ? "success" : "neutral"}>
+                      {isNewPatient ? "Cliente nuevo" : "Cliente existente"}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </button>
           );
@@ -209,7 +220,14 @@ export function WhatsAppInbox({
                 <Avatar label={selected.customer_name || selected.customer_phone} size="sm" />
                 <div>
                   <p className="text-sm font-semibold">{selected.customer_name || selected.customer_phone}</p>
-                  <p className="text-xs text-muted">{selected.customer_phone}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs text-muted">{selected.customer_phone}</p>
+                    {isNewPatientBySession[selected.id] !== undefined && (
+                      <Badge tone={isNewPatientBySession[selected.id] ? "success" : "neutral"}>
+                        {isNewPatientBySession[selected.id] ? "Cliente nuevo" : "Cliente existente"}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
               <select

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatCallStatus } from "@/lib/callStatus";
 import type { DashboardRecentCall } from "@/lib/dashboardData";
 
 function formatWhen(iso: string | null): string {
@@ -31,7 +32,11 @@ export function RecentCalls({ calls }: { calls: DashboardRecentCall[] }) {
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-xs text-muted">{formatWhen(call.when)}</span>
-            {call.status && <Badge tone={call.status === "ended" ? "neutral" : "success"}>{call.status}</Badge>}
+            {call.status &&
+              (() => {
+                const { label, tone } = formatCallStatus(call.status);
+                return <Badge tone={tone}>{label}</Badge>;
+              })()}
             <Link href={`/transcripciones/${call.id}`} className="text-xs font-medium text-primary hover:underline">
               Ver transcripción
             </Link>

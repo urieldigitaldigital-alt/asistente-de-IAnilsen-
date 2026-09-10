@@ -130,7 +130,7 @@ export async function sendChatMessage(params: {
     returningCustomer,
     channel: "whatsapp",
   });
-  const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null };
+  const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null, whatsappSessionId: sessionId };
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     const response = await anthropic.messages.create({

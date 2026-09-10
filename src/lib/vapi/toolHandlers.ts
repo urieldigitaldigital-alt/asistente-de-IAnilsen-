@@ -35,6 +35,8 @@ export interface ToolHandlerContext {
   config: AgentConfig;
   /** id de la fila en `calls` para esta llamada (ya existe gracias al upsert previo al dispatch). */
   callRowId: string | null;
+  /** id de la fila en `whatsapp_sessions` si este tool call vino de una conversación de WhatsApp (no aplica a llamadas de voz). */
+  whatsappSessionId?: string | null;
 }
 
 /**
@@ -212,6 +214,7 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
     .insert({
       clinic_id: ctx.clinic.id,
       call_id: ctx.callRowId,
+      whatsapp_session_id: ctx.whatsappSessionId ?? null,
       google_event_id: googleEventId,
       google_event_link: googleEventLink,
       patient_name: data.patientName,
@@ -233,6 +236,16 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
     }
     console.error("Error al guardar la cita:", error);
     return "No pude guardar la cita, intentemos de nuevo en un momento.";
+  }
+
+  // El cliente recién dio su nombre real acá — lo reflejamos en la
+  // conversación de WhatsApp para identificarlo en el listado (antes solo
+  // se veía el número de teléfono).
+  if (ctx.whatsappSessionId) {
+    await ctx.admin
+      .from("whatsapp_sessions")
+      .update({ customer_name: data.patientName })
+      .eq("id", ctx.whatsappSessionId);
   }
 
   // Awaited (no fire-and-forget): en un entorno serverless la función puede

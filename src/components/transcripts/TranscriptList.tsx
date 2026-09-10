@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatCallStatus } from "@/lib/callStatus";
 import type { CallListItem } from "@/lib/transcriptsData";
 
 function formatWhen(iso: string | null): string {
@@ -36,7 +37,11 @@ export function TranscriptList({ calls }: { calls: CallListItem[] }) {
             <div className="flex shrink-0 items-center gap-3">
               <span className="text-xs text-muted">{formatWhen(call.when)}</span>
               {call.hasAppointment && <Badge tone="success">Generó cita</Badge>}
-              {call.status && <Badge tone="neutral">{call.status}</Badge>}
+              {call.status &&
+                (() => {
+                  const { label, tone } = formatCallStatus(call.status);
+                  return <Badge tone={tone}>{label}</Badge>;
+                })()}
             </div>
           </Link>
         </li>

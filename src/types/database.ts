@@ -243,6 +243,7 @@ export interface Database {
           id: string;
           clinic_id: string;
           call_id: string | null;
+          whatsapp_session_id: string | null;
           google_event_id: string | null;
           google_event_link: string | null;
           patient_name: string;
