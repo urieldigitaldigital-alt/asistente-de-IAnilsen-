@@ -25,6 +25,14 @@ export interface DashboardInquiry {
   createdAt: string;
 }
 
+export interface DashboardActivityItem {
+  id: string;
+  type: "call" | "whatsapp" | "booking";
+  title: string;
+  subtitle: string | null;
+  when: string;
+}
+
 export interface DashboardData {
   businessType: BusinessType;
   callsToday: number;
@@ -46,6 +54,7 @@ export interface DashboardData {
   inquiriesToday: number;
   inquiriesPending: number;
   recentInquiries: DashboardInquiry[];
+  recentActivity: DashboardActivityItem[];
 }
 
 function startOfDay(date: Date): Date {
@@ -92,6 +101,37 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     }
   })();
 
+  // Para la sección "Actividad reciente" del dashboard — la tabla de la que
+  // vienen los últimos "eventos importantes" depende del rubro; "llamadas" no
+  // necesita query propia porque ya se trae más abajo como recentInquiries.
+  const recentBookingsQuery = (() => {
+    switch (businessType) {
+      case "pedidos":
+      case "restaurante":
+        return supabase
+          .from("orders")
+          .select("id, customer_name, order_number, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5);
+      case "inmobiliaria":
+        return supabase
+          .from("property_visits")
+          .select("id, customer_name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5);
+      case "llamadas":
+        return null;
+      case "citas":
+      default:
+        return supabase
+          .from("appointments")
+          .select("id, patient_name, treatment, created_at")
+          .eq("status", "scheduled")
+          .order("created_at", { ascending: false })
+          .limit(5);
+    }
+  })();
+
   const [
     callsTodayRes,
     callsWeekRes,
@@ -110,6 +150,8 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     inquiriesTodayRes,
     inquiriesPendingRes,
     recentInquiriesRes,
+    recentBookingsRes,
+    recentWhatsappRes,
   ] = await Promise.all([
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
@@ -136,6 +178,13 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
       .select("id, customer_name, customer_phone, reason, contacted, created_at")
       .order("created_at", { ascending: false })
       .limit(10),
+    recentBookingsQuery ?? Promise.resolve({ data: [] as { id: string }[] }),
+    supabase
+      .from("whatsapp_messages")
+      .select("id, session_id, body, created_at")
+      .eq("role", "customer")
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   const weekCalls = weekCallsRes.data ?? [];
@@ -179,6 +228,71 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     summary: call.summary,
   }));
 
+  // "Actividad reciente": une llamadas + mensajes de WhatsApp + el evento
+  // "importante" del rubro (cita/pedido/visita/consulta) en una sola línea de
+  // tiempo — cada rubro guarda ese evento en una tabla distinta, así que se
+  // arma con un shape laxo en vez de forzar un tipo único.
+  type RawBookingRow = {
+    id: string;
+    patient_name?: string;
+    treatment?: string;
+    customer_name?: string | null;
+    order_number?: number;
+    created_at: string;
+  };
+  const recentBookingsRaw = (recentBookingsRes.data as RawBookingRow[] | null) ?? [];
+
+  const whatsappMessageRows = recentWhatsappRes.data ?? [];
+  const whatsappSessionIds = [...new Set(whatsappMessageRows.map((m) => m.session_id))];
+  const { data: sessionsForActivity } = whatsappSessionIds.length
+    ? await supabase.from("whatsapp_sessions").select("id, customer_name, customer_phone").in("id", whatsappSessionIds)
+    : { data: [] as { id: string; customer_name: string | null; customer_phone: string }[] };
+  const sessionLabelById = new Map((sessionsForActivity ?? []).map((s) => [s.id, s.customer_name || s.customer_phone]));
+
+  const callActivity: DashboardActivityItem[] = (recentCallsRes.data ?? []).map((call) => ({
+    id: `call-${call.id}`,
+    type: "call",
+    title: call.phone_number ?? "Número desconocido",
+    subtitle: call.summary,
+    when: call.started_at ?? call.created_at,
+  }));
+
+  const whatsappActivity: DashboardActivityItem[] = whatsappMessageRows.map((m) => ({
+    id: `wa-${m.id}`,
+    type: "whatsapp",
+    title: sessionLabelById.get(m.session_id) ?? "WhatsApp",
+    subtitle: m.body,
+    when: m.created_at,
+  }));
+
+  const isOrders = businessType === "pedidos" || businessType === "restaurante";
+  const bookingActivity: DashboardActivityItem[] =
+    businessType === "llamadas"
+      ? (recentInquiriesRes.data ?? []).map((row) => ({
+          id: `booking-${row.id}`,
+          type: "booking" as const,
+          title: row.customer_name || row.customer_phone,
+          subtitle: row.reason,
+          when: row.created_at,
+        }))
+      : recentBookingsRaw.map((row) => ({
+          id: `booking-${row.id}`,
+          type: "booking" as const,
+          title: row.patient_name || row.customer_name || "Cliente",
+          subtitle: isOrders
+            ? row.order_number
+              ? `Pedido #${row.order_number}`
+              : "Pedido nuevo"
+            : businessType === "inmobiliaria"
+              ? "Visita agendada"
+              : row.treatment || "Cita agendada",
+          when: row.created_at,
+        }));
+
+  const recentActivity = [...callActivity, ...whatsappActivity, ...bookingActivity]
+    .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
+    .slice(0, 8);
+
   return {
     businessType,
     callsToday: callsTodayRes.count ?? 0,
@@ -207,5 +321,6 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
       contacted: row.contacted,
       createdAt: row.created_at,
     })),
+    recentActivity,
   };
 }

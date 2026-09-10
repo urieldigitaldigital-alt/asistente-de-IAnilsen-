@@ -15,6 +15,8 @@ import type { Metadata } from "next";
 import { CallsChart } from "@/components/dashboard/CallsChart";
 import { InquiriesList } from "@/components/dashboard/InquiriesList";
 import { IntegrationStatus } from "@/components/dashboard/IntegrationStatus";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { RecentCalls } from "@/components/dashboard/RecentCalls";
 import { Card } from "@/components/ui/Card";
 import { StatTile } from "@/components/ui/StatTile";
@@ -32,6 +34,11 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted">Resumen de la actividad del agente de voz.</p>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold">Accesos rápidos</h2>
+        <QuickActions businessType={data.businessType} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -95,19 +102,8 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <h2 className="mb-4 text-sm font-semibold">Últimos 7 días</h2>
-          <CallsChart
-            data={data.chart}
-            secondaryLabel={
-              data.businessType === "pedidos" || data.businessType === "restaurante"
-                ? "Pedidos"
-                : data.businessType === "inmobiliaria"
-                  ? "Visitas"
-                  : data.businessType === "llamadas"
-                    ? "Consultas"
-                    : "Citas agendadas"
-            }
-          />
+          <h2 className="mb-2 text-sm font-semibold">Actividad reciente</h2>
+          <RecentActivity items={data.recentActivity} />
         </Card>
         <IntegrationStatus
           googleConnected={data.googleConnected}
@@ -115,6 +111,22 @@ export default async function DashboardPage() {
           vapiPhoneNumberId={data.vapiPhoneNumberId}
         />
       </div>
+
+      <Card>
+        <h2 className="mb-4 text-sm font-semibold">Últimos 7 días</h2>
+        <CallsChart
+          data={data.chart}
+          secondaryLabel={
+            data.businessType === "pedidos" || data.businessType === "restaurante"
+              ? "Pedidos"
+              : data.businessType === "inmobiliaria"
+                ? "Visitas"
+                : data.businessType === "llamadas"
+                  ? "Consultas"
+                  : "Citas agendadas"
+          }
+        />
+      </Card>
 
       <Card>
         <h2 className="mb-2 text-sm font-semibold">Últimas llamadas</h2>
