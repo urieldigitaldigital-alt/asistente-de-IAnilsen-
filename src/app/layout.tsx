@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Necesario para que las URLs relativas de abajo (icons, openGraph.images)
+// se resuelvan a absolutas — Google y las redes sociales solo siguen URLs
+// completas, nunca "/logo.png" tal cual.
+const SITE_URL = "https://www.asistentnilsenia.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Asistente Nilsen IA",
   description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
   icons: { apple: "/logo.png" },
@@ -22,6 +28,23 @@ export const metadata: Metadata = {
   // cuando el sitio se instaló como app desde "Compartir → Agregar a inicio"
   // — desde una pestaña normal, el permiso de notificaciones se ignora.
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Nilsen IA" },
+  // El logo como imagen de vista previa: la usa Google al mostrar el sitio
+  // en resultados de búsqueda, y WhatsApp/redes sociales al compartir el link.
+  openGraph: {
+    title: "Asistente Nilsen IA",
+    description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+    url: SITE_URL,
+    siteName: "Asistente Nilsen IA",
+    images: [{ url: "/logo.png", width: 1254, height: 1254, alt: "Asistente Nilsen IA" }],
+    locale: "es_AR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Asistente Nilsen IA",
+    description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+    images: ["/logo.png"],
+  },
 };
 
 export const viewport: Viewport = {
