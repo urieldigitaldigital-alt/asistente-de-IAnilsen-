@@ -23,7 +23,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Asistente Nilsen IA",
   description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
-  icons: { apple: "/logo.png" },
+  // Declarar "icon" a mano en vez de dejar que src/app/icon.png se detecte
+  // solo: al definir "icons" acá (por el "apple" de abajo), Next deja de
+  // autogenerar el <link rel="icon"> del ícono por convención de archivo —
+  // sin esto, la pestaña del navegador y Google se quedan sin favicon.
+  icons: { icon: "/logo.png", shortcut: "/logo.png", apple: "/logo.png" },
   // "apple-mobile-web-app-capable": Safari solo permite notificaciones push
   // cuando el sitio se instaló como app desde "Compartir → Agregar a inicio"
   // — desde una pestaña normal, el permiso de notificaciones se ignora.
