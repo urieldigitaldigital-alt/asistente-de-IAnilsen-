@@ -186,6 +186,7 @@ export interface Database {
           customer_name: string | null;
           status: WhatsappConversationStatus;
           last_message_at: string;
+          pending_reply_at: string | null;
           updated_at: string;
           created_at: string;
         };

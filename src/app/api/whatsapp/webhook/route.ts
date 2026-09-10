@@ -1,10 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrCreateWhatsappSession, sendChatMessage } from "@/lib/whatsapp/chat";
+import { getOrCreateWhatsappSession } from "@/lib/whatsapp/chat";
 import { findClinicByVerifyToken, getWhatsappCredentialsByPhoneNumberId } from "@/lib/whatsapp/credentials";
 import { logWhatsappMessage } from "@/lib/whatsapp/messages";
 import { parseMetaWebhookPayload, sendWhatsAppMessage } from "@/lib/whatsapp/meta";
+
+// No contestamos apenas llega el mensaje: se guarda para cuándo "toca"
+// responder y un cron (ver api/whatsapp/process-pending) dispara la
+// respuesta real — así el asistente no responde al instante como un bot,
+// sino con la demora natural de una persona ocupada revisando el celular.
+const REPLY_DELAY_MS = 5 * 60 * 1000;
 
 /** Meta llama a esto una vez, al configurar el webhook en developers.facebook.com, para confirmar que la URL es válida. */
 export async function GET(request: NextRequest) {
@@ -94,29 +100,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({});
     }
 
-    const reply = await sendChatMessage({
-      admin,
-      clinic,
-      config,
-      sessionId: conversation.id,
-      customerPhone: inbound.from,
-      input: inbound.body,
-    });
-    const replyText = reply ?? "Gracias por tu mensaje. En breve te contestamos.";
-
-    await logWhatsappMessage(admin, {
-      clinicId: credentials.clinicId,
-      sessionId: conversation.id,
-      role: "assistant",
-      body: replyText,
-    });
-
-    await sendWhatsAppMessage({
-      phoneNumberId: credentials.metaPhoneNumberId,
-      accessToken: credentials.metaAccessToken,
-      to: inbound.from,
-      body: replyText,
-    });
+    // Debounce: si llegan más mensajes de este cliente antes de que se
+    // cumpla esta hora, el próximo insert vuelve a pisar este valor más
+    // adelante — el cron solo contesta cuando el cliente para de escribir.
+    await admin
+      .from("whatsapp_sessions")
+      .update({ pending_reply_at: new Date(Date.now() + REPLY_DELAY_MS).toISOString() })
+      .eq("id", conversation.id);
   } catch (err) {
     console.error("Error procesando mensaje de WhatsApp:", err);
     await sendFallback("Estamos teniendo un problema técnico. En breve te contesta alguien del equipo.");

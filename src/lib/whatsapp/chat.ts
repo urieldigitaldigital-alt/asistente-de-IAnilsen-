@@ -5,6 +5,8 @@ import { buildPersonalizedFirstMessage, findReturningCustomerOrderDetails } from
 import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
 import { buildAssistantTools } from "@/lib/vapi/tools";
 import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
+import { logWhatsappMessage } from "@/lib/whatsapp/messages";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/meta";
 import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/database";
 
 // Haiku 4.5 confirmaba citas/pedidos por texto ("listo, quedó agendado") sin
@@ -157,4 +159,56 @@ export async function sendChatMessage(params: {
   }
 
   return null;
+}
+
+/**
+ * Genera y manda la respuesta real de una conversación cuya "hora de
+ * contestar" (`pending_reply_at`) ya se cumplió — llamada por el cron de
+ * `api/whatsapp/process-pending`, nunca directo desde el webhook (ver ese
+ * archivo para el porqué del delay). Si el último mensaje de la conversación
+ * no es del cliente (p. ej. el dueño ya contestó a mano mientras esperaba),
+ * no hace nada — no hay nada nuevo que responder.
+ */
+export async function replyToPendingWhatsappSession(params: {
+  admin: SupabaseClient<Database>;
+  clinic: Clinic;
+  config: AgentConfig;
+  sessionId: string;
+  customerPhone: string;
+  credentials: { metaPhoneNumberId: string; metaAccessToken: string };
+}): Promise<void> {
+  const { admin, clinic, config, sessionId, customerPhone, credentials } = params;
+
+  const { data: lastMessage } = await admin
+    .from("whatsapp_messages")
+    .select("role, body")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!lastMessage || lastMessage.role !== "customer") return;
+
+  const reply = await sendChatMessage({
+    admin,
+    clinic,
+    config,
+    sessionId,
+    customerPhone,
+    input: lastMessage.body,
+  });
+  const replyText = reply ?? "Gracias por tu mensaje. En breve te contestamos.";
+
+  await logWhatsappMessage(admin, {
+    clinicId: clinic.id,
+    sessionId,
+    role: "assistant",
+    body: replyText,
+  });
+
+  await sendWhatsAppMessage({
+    phoneNumberId: credentials.metaPhoneNumberId,
+    accessToken: credentials.metaAccessToken,
+    to: customerPhone,
+    body: replyText,
+  });
 }
