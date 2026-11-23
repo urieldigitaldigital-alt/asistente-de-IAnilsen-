@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+// AUTH_PATHS: además de públicas, redirigen a /dashboard si ya hay sesión
+// (no tiene sentido ver el form de login/signup estando logueado).
+const AUTH_PATHS = ["/login", "/signup"];
+// Legales: públicas siempre (las lee Meta sin sesión al revisar la app),
+// pero un usuario logueado también debe poder verlas sin que lo manden a /dashboard.
+const LEGAL_PATHS = ["/politica-de-privacidad", "/eliminacion-de-datos"];
+const PUBLIC_PATHS = [...AUTH_PATHS, ...LEGAL_PATHS];
 
 // Next.js 16: esto reemplaza a middleware.ts. Runtime nodejs fijo, no configurable.
 export async function proxy(request: NextRequest) {
@@ -41,7 +47,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicPath) {
+  const isAuthPath = AUTH_PATHS.some((path) => pathname.startsWith(path));
+  if (user && isAuthPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
