@@ -2,7 +2,6 @@ import type { Icon } from "@phosphor-icons/react";
 import {
   CalendarBlankIcon,
   ChartLineUpIcon,
-  ChatCircleTextIcon,
   ForkKnifeIcon,
   GearSixIcon,
   HouseLineIcon,
@@ -26,7 +25,7 @@ function shortcutsFor(businessType: BusinessType): { href: string; label: string
     case "inmobiliaria":
       return [{ href: "/propiedades", label: "Propiedades", icon: HouseLineIcon }];
     case "llamadas":
-      return [{ href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon }];
+      return [];
     case "citas":
     default:
       return [

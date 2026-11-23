@@ -1,15 +1,13 @@
 import {
   CalendarCheckIcon,
   ClockCounterClockwiseIcon,
-  PhoneIcon,
   WhatsappLogoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { DashboardActivityItem } from "@/lib/dashboardData";
 
-const TYPE_CONFIG: Record<DashboardActivityItem["type"], { icon: typeof PhoneIcon; classes: string }> = {
-  call: { icon: PhoneIcon, classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+const TYPE_CONFIG: Record<DashboardActivityItem["type"], { icon: typeof WhatsappLogoIcon; classes: string }> = {
   whatsapp: { icon: WhatsappLogoIcon, classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
   booking: { icon: CalendarCheckIcon, classes: "bg-primary/10 text-primary" },
 };
@@ -28,7 +26,7 @@ export function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
       <EmptyState
         icon={ClockCounterClockwiseIcon}
         title="Todavía no hay actividad"
-        description="Las llamadas, mensajes de WhatsApp y citas nuevas van a aparecer acá a medida que pasen."
+        description="Los mensajes de WhatsApp y las citas nuevas van a aparecer acá a medida que pasen."
       />
     );
   }

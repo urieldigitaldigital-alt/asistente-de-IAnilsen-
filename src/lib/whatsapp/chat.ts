@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { buildPersonalizedFirstMessage, findReturningCustomerOrderDetails } from "@/lib/vapi/personalization";
-import { buildSystemPrompt } from "@/lib/vapi/promptBuilder";
-import { buildAssistantTools } from "@/lib/vapi/tools";
-import { dispatchToolCall, type ToolHandlerContext } from "@/lib/vapi/toolHandlers";
+import { buildPersonalizedFirstMessage, findReturningCustomerOrderDetails } from "@/lib/assistant/personalization";
+import { buildSystemPrompt } from "@/lib/assistant/promptBuilder";
+import { buildAssistantTools } from "@/lib/assistant/tools";
+import { dispatchToolCall, type ToolHandlerContext } from "@/lib/assistant/toolHandlers";
 import { logWhatsappMessage } from "@/lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/meta";
 import type { AgentConfig, BusinessType, Clinic, Database } from "@/types/database";
@@ -27,22 +27,13 @@ function getAnthropicClient(): Anthropic {
   return new Anthropic({ apiKey });
 }
 
-/**
- * Mismas tools que usan las llamadas (mismo `dispatchToolCall`, misma lógica
- * de negocio) traducidas al formato de Claude — sin las nativas de VAPI
- * (endCall/transferCall), que no aplican a una conversación de texto.
- */
-function buildClaudeTools(businessType: BusinessType): Anthropic.Tool[] {
-  return buildAssistantTools({ businessType })
-    .filter((tool) => tool.type === "function" && tool.function)
-    .map((tool) => {
-      const fn = (tool as Extract<typeof tool, { type: "function" }>).function!;
-      return {
-        name: fn.name!,
-        description: fn.description,
-        input_schema: (fn.parameters ?? { type: "object", properties: {} }) as Anthropic.Tool.InputSchema,
-      };
-    });
+/** Tools del negocio (mismo `dispatchToolCall`, misma lógica) traducidas al formato de Claude. */
+function buildClaudeTools(businessType: BusinessType, salesClosingEnabled: boolean): Anthropic.Tool[] {
+  return buildAssistantTools({ businessType, salesClosingEnabled }).map((tool) => ({
+    name: tool.function.name,
+    description: tool.function.description,
+    input_schema: tool.function.parameters as Anthropic.Tool.InputSchema,
+  }));
 }
 
 export interface WhatsappConversation {
@@ -115,22 +106,21 @@ export async function sendChatMessage(params: {
   }));
   messages.push({ role: "user", content: input });
 
-  const tools = buildClaudeTools(clinic.business_type);
+  const tools = buildClaudeTools(clinic.business_type, config.sales_closing_enabled);
   const lastPriorMessageAt = priorHistory[priorHistory.length - 1]?.created_at;
   const hoursSinceLastMessage = lastPriorMessageAt ? (Date.now() - new Date(lastPriorMessageAt).getTime()) / 3_600_000 : Infinity;
-  // Conversación nueva o retomada después de un rato largo: usa el mismo
-  // saludo de bienvenida/personalizado a cliente recurrente que las llamadas,
-  // configurado en Personalización, y recién ahí vuelve a ofrecer reusar los
-  // datos guardados de un pedido anterior.
+  // Conversación nueva o retomada después de un rato largo: usa el saludo de
+  // bienvenida/personalizado a cliente recurrente configurado en
+  // Personalización, y recién ahí vuelve a ofrecer reusar los datos
+  // guardados de un pedido anterior.
   const isNewDay = priorHistory.length === 0 || hoursSinceLastMessage >= NEW_DAY_GAP_HOURS;
   const greeting = isNewDay ? await buildPersonalizedFirstMessage(admin, clinic, config, customerPhone) : null;
   const returningCustomer = isNewDay ? await findReturningCustomerOrderDetails(admin, clinic, customerPhone) : null;
   const system = buildSystemPrompt(clinic, config, {
-    opening: greeting ? { channel: "whatsapp", greeting } : undefined,
+    opening: greeting ? { greeting } : undefined,
     returningCustomer,
-    channel: "whatsapp",
   });
-  const ctx: ToolHandlerContext = { admin, clinic, config, callRowId: null, whatsappSessionId: sessionId };
+  const ctx: ToolHandlerContext = { admin, clinic, config, whatsappSessionId: sessionId };
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
     const response = await anthropic.messages.create({

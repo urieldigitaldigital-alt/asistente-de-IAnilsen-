@@ -3,20 +3,14 @@
 import { PaperPlaneRightIcon } from "@phosphor-icons/react";
 import { useState, useTransition } from "react";
 
-import { sendSandboxMessageAction } from "@/actions/sandboxChat";
+import { sendSandboxMessageAction, type SandboxChatMessage } from "@/actions/sandboxChat";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
-interface SandboxMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export function SandboxChat({ systemPrompt, modelName }: { systemPrompt: string; modelName: string }) {
-  const [messages, setMessages] = useState<SandboxMessage[]>([]);
+export function SandboxChat({ systemPrompt }: { systemPrompt: string }) {
+  const [messages, setMessages] = useState<SandboxChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [chatId, setChatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -24,16 +18,16 @@ export function SandboxChat({ systemPrompt, modelName }: { systemPrompt: string;
     const text = input.trim();
     if (!text) return;
     setInput("");
+    const history = messages;
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setError(null);
 
     startTransition(async () => {
-      const result = await sendSandboxMessageAction(systemPrompt, modelName, text, chatId);
+      const result = await sendSandboxMessageAction(systemPrompt, history, text);
       if (result.error) {
         setError(result.error);
         return;
       }
-      setChatId(result.chatId);
       setMessages((prev) => [...prev, { role: "assistant", content: result.reply }]);
     });
   };

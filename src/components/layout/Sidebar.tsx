@@ -3,7 +3,6 @@
 import {
   CalendarBlankIcon,
   ChartLineUpIcon,
-  ChatCircleTextIcon,
   ForkKnifeIcon,
   GearSixIcon,
   HouseLineIcon,
@@ -21,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { BusinessType } from "@/types/database";
 
 // Cada rubro solo ve las pantallas que le corresponden — "llamadas" no tiene
-// ninguna pantalla de dominio propia (solo toma consultas por teléfono).
+// ninguna pantalla de dominio propia (solo toma consultas por WhatsApp).
 function getDomainNavItems(businessType: BusinessType) {
   switch (businessType) {
     case "pedidos":
@@ -49,7 +48,6 @@ function getNavItems(businessType: BusinessType) {
     { href: "/dashboard", label: "Dashboard", icon: SquaresFourIcon },
     ...getDomainNavItems(businessType),
     { href: "/whatsapp", label: "WhatsApp", icon: WhatsappLogoIcon },
-    { href: "/transcripciones", label: "Transcripciones", icon: ChatCircleTextIcon },
     { href: "/personalizacion", label: "Personalización", icon: GearSixIcon },
     { href: "/integraciones", label: "Integraciones", icon: PlugsConnectedIcon },
   ];

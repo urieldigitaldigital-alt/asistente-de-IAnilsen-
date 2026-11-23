@@ -2,14 +2,13 @@
 
 import { useActionState, useMemo, useState } from "react";
 
-import { saveAgentConfigAction, saveAndPublishAgentConfigAction, type AgentConfigActionState } from "@/actions/agentConfig";
+import { saveAgentConfigAction, type AgentConfigActionState } from "@/actions/agentConfig";
 import { BusinessHoursEditor } from "@/components/customize/BusinessHoursEditor";
 import { ClinicInfoForm } from "@/components/customize/ClinicInfoForm";
 import { MenuEditor } from "@/components/customize/MenuEditor";
 import { PromptEditor } from "@/components/customize/PromptEditor";
 import { SandboxChat } from "@/components/customize/SandboxChat";
 import { ServicesEditor } from "@/components/customize/ServicesEditor";
-import { VoiceLanguageSelect } from "@/components/customize/VoiceLanguageSelect";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
@@ -53,15 +52,12 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
     config.max_appointments_per_day != null ? String(config.max_appointments_per_day) : ""
   );
   const [ownerNotificationPhone, setOwnerNotificationPhone] = useState(config.owner_notification_phone ?? "");
-
-  const [voiceProvider, setVoiceProvider] = useState(config.voice.provider || "azure");
-  const [voiceId, setVoiceId] = useState(config.voice.voiceId || "es-MX-DaliaNeural");
-  const [speed, setSpeed] = useState(config.voice.speed ?? 1.15);
-  const [language, setLanguage] = useState(config.language);
-  const [modelName, setModelName] = useState(config.model.model || "gpt-4.1");
+  const [salesClosingEnabled, setSalesClosingEnabled] = useState(config.sales_closing_enabled);
+  const [autoFollowUpEnabled, setAutoFollowUpEnabled] = useState(config.auto_follow_up_enabled);
+  const [followUpDays, setFollowUpDays] = useState(String(config.follow_up_days));
+  const [language] = useState(config.language);
 
   const [saveState, saveAction, savePending] = useActionState(saveAgentConfigAction, idleState);
-  const [publishState, publishAction, publishPending] = useActionState(saveAndPublishAgentConfigAction, idleState);
 
   const configJson = useMemo(
     () =>
@@ -72,13 +68,14 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         services,
         menu_items: menuItems,
         business_hours: businessHours,
-        voice: { provider: voiceProvider, voiceId, speed },
         language,
-        model: { provider: "openai", model: modelName },
         first_message: firstMessage,
         handoff_message: handoffMessage,
         max_appointments_per_day: maxAppointmentsPerDay.trim() === "" ? null : Number(maxAppointmentsPerDay),
         owner_notification_phone: ownerNotificationPhone.trim() === "" ? null : ownerNotificationPhone.trim(),
+        sales_closing_enabled: salesClosingEnabled,
+        auto_follow_up_enabled: autoFollowUpEnabled,
+        follow_up_days: followUpDays.trim() === "" ? 2 : Number(followUpDays),
       }),
     [
       systemPrompt,
@@ -89,15 +86,14 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
       services,
       menuItems,
       businessHours,
-      voiceProvider,
-      voiceId,
-      speed,
       language,
-      modelName,
       firstMessage,
       handoffMessage,
       maxAppointmentsPerDay,
       ownerNotificationPhone,
+      salesClosingEnabled,
+      autoFollowUpEnabled,
+      followUpDays,
     ]
   );
 
@@ -188,39 +184,74 @@ export function AgentConfigForm({ clinic, config }: { clinic: Clinic; config: Ag
         </Card>
       )}
 
-      <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
-      <VoiceLanguageSelect
-        voiceProvider={voiceProvider}
-        onVoiceProviderChange={setVoiceProvider}
-        voiceId={voiceId}
-        onVoiceIdChange={setVoiceId}
-        speed={speed}
-        onSpeedChange={setSpeed}
-        language={language}
-        onLanguageChange={setLanguage}
-        modelName={modelName}
-        onModelNameChange={setModelName}
-      />
+      {businessType === "citas" && (
+        <Card className="space-y-2">
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={salesClosingEnabled}
+              onChange={(e) => setSalesClosingEnabled(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-semibold">Intentar cerrar clientes, no solo agendar llamadas</span>
+              <p className="mt-1 text-muted">
+                Si lo activás, cuando alguien se muestre muy interesado el asistente va a intentar cerrarlo como
+                cliente ahí mismo (en vez de siempre derivar a una llamada) y te va a avisar. Los que no se muestren
+                tan interesados siguen yendo al flujo normal de agendar una llamada. Los clientes cerrados aparecen en
+                el CRM.
+              </p>
+            </span>
+          </label>
+        </Card>
+      )}
 
-      <SandboxChat systemPrompt={systemPrompt} modelName={modelName} />
+      <Card className="space-y-2">
+        <label className="flex items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={autoFollowUpEnabled}
+            onChange={(e) => setAutoFollowUpEnabled(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Seguimiento automático a quien no contesta</span>
+            <p className="mt-1 text-muted">
+              Si un cliente deja de responder, el asistente le vuelve a escribir un único mensaje para retomar la
+              conversación — no reemplaza tu criterio, se detiene solo si el cliente contesta o si lo marcás como
+              &quot;no interesado&quot;.
+            </p>
+          </span>
+        </label>
+        {autoFollowUpEnabled && (
+          <div className="ml-7 max-w-40">
+            <Label htmlFor="follow_up_days">Días sin respuesta antes de escribir de nuevo</Label>
+            <Input
+              id="follow_up_days"
+              type="number"
+              min={1}
+              max={14}
+              value={followUpDays}
+              onChange={(e) => setFollowUpDays(e.target.value)}
+            />
+          </div>
+        )}
+      </Card>
+
+      <BusinessHoursEditor hours={businessHours} onChange={setBusinessHours} />
+
+      <SandboxChat systemPrompt={systemPrompt} />
 
       <div className="sticky bottom-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <form action={saveAction}>
           <input type="hidden" name="config_json" value={configJson} />
           <input type="hidden" name="clinic_json" value={clinicJson} />
-          <Button type="submit" variant="secondary" disabled={savePending || publishPending}>
+          <Button type="submit" disabled={savePending}>
             {savePending ? "Guardando…" : "Guardar cambios"}
           </Button>
         </form>
-        <form action={publishAction}>
-          <input type="hidden" name="config_json" value={configJson} />
-          <input type="hidden" name="clinic_json" value={clinicJson} />
-          <Button type="submit" disabled={savePending || publishPending}>
-            {publishPending ? "Publicando…" : "Publicar"}
-          </Button>
-        </form>
         <div className="flex-1">
-          <StatusMessage state={saveState.error || saveState.success ? saveState : publishState} />
+          <StatusMessage state={saveState} />
         </div>
       </div>
     </div>

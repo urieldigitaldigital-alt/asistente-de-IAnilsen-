@@ -220,9 +220,9 @@ export function OrdersBoard({
   const [isPending] = useTransition();
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>("todos");
 
-  // Interruptores del negocio (no del dispositivo): pausar pedidos por
-  // teléfono o aceptar solo retiro en el local. Se guardan en agent_configs
-  // y los lee también el asistente de VAPI para decidir si toma el pedido.
+  // Interruptores del negocio (no del dispositivo): pausar pedidos o
+  // aceptar solo retiro en el local. Se guardan en agent_configs y los lee
+  // también el asistente para decidir si toma el pedido.
   const [ordersPaused, setOrdersPausedState] = useState(initialOrdersPaused);
   const [pickupOnly, setPickupOnlyState] = useState(initialPickupOnly);
   const [, startSettingsTransition] = useTransition();

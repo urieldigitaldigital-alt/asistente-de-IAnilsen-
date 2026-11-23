@@ -1,4 +1,4 @@
-import { CalendarBlankIcon, CheckCircleIcon, PhoneIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { CalendarBlankIcon, CheckCircleIcon, WarningCircleIcon, WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/Card";
@@ -30,29 +30,27 @@ function Row({
 
 export function IntegrationStatus({
   googleConnected,
-  vapiAssistantId,
-  vapiPhoneNumberId,
+  whatsappConnected,
 }: {
   googleConnected: boolean;
-  vapiAssistantId: string | null;
-  vapiPhoneNumberId: string | null;
+  whatsappConnected: boolean;
 }) {
   return (
     <Card className="space-y-4">
       <h2 className="text-sm font-semibold">Estado de integraciones</h2>
+      <Row
+        icon={WhatsappLogoIcon}
+        label="WhatsApp"
+        connected={whatsappConnected}
+        connectedLabel="Conectado"
+        disconnectedLabel="No conectado"
+      />
       <Row
         icon={CalendarBlankIcon}
         label="Google Calendar"
         connected={googleConnected}
         connectedLabel="Conectado"
         disconnectedLabel="No conectado"
-      />
-      <Row
-        icon={PhoneIcon}
-        label="Asistente y número de VAPI"
-        connected={Boolean(vapiAssistantId && vapiPhoneNumberId)}
-        connectedLabel="Provisionado"
-        disconnectedLabel="Pendiente de publicar"
       />
       <Link href="/integraciones" className="block text-sm font-medium text-primary hover:underline">
         Ir a Integraciones →

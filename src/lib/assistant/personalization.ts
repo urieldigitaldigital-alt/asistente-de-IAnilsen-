@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { buildFirstMessage, type ReturningCustomerOrderDetails } from "@/lib/vapi/promptBuilder";
+import { buildFirstMessage, type ReturningCustomerOrderDetails } from "@/lib/assistant/promptBuilder";
 import type { AgentConfig, Clinic, Database } from "@/types/database";
 
 type AdminClient = SupabaseClient<Database>;
@@ -95,9 +95,9 @@ export async function findReturningCustomerOrderDetails(
 }
 
 /**
- * Saludo del primer mensaje de la llamada: si el número que llama coincide
- * con el de un pedido/cita anterior de este negocio, saluda por su nombre;
- * si no, usa el mensaje inicial normal.
+ * Saludo del primer mensaje de la conversación: si el número coincide con el
+ * de un pedido/cita anterior de este negocio, saluda por su nombre; si no,
+ * usa el mensaje inicial normal.
  */
 export async function buildPersonalizedFirstMessage(
   admin: AdminClient,
@@ -120,7 +120,7 @@ export async function buildPersonalizedFirstMessage(
       clinic.business_type === "pedidos" || clinic.business_type === "restaurante"
         ? "¿Qué te gustaría pedir hoy?"
         : "¿En qué te puedo ayudar hoy?";
-    return `¡Hola ${firstName}! Gracias por volver a llamar a ${clinic.name}. ${help}`;
+    return `¡Hola ${firstName}! Gracias por volver a escribirnos a ${clinic.name}. ${help}`;
   } catch (err) {
     console.error("Error buscando cliente recurrente:", err);
     return fallback;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
-// Tools de VAPI (payloads no confiables recibidos por el webhook)
+// Tools del asistente (payloads no confiables generados por el modelo)
 // ---------------------------------------------------------------------------
 
 // El modelo casi nunca manda un offset/"Z" aunque se le pida ISO 8601 completo
@@ -36,6 +36,13 @@ export const bookAppointmentSchema = z.object({
   patientEmail: z.string().email().optional(),
   treatment: z.string().min(1),
   isNewPatient: z.boolean(),
+  notes: z.string().optional(),
+});
+
+export const closeClientSchema = z.object({
+  clientName: z.string().min(1),
+  clientPhone: phoneSchema,
+  service: z.string().min(1),
   notes: z.string().optional(),
 });
 
@@ -93,6 +100,10 @@ export const logInquirySchema = z.object({
   reason: z.string().min(1),
 });
 
+export const updateLeadInterestSchema = z.object({
+  level: z.enum(["interesado", "no_interesado"]),
+});
+
 // ---------------------------------------------------------------------------
 // Personalización (formularios del panel)
 // ---------------------------------------------------------------------------
@@ -147,14 +158,7 @@ export const agentConfigFormSchema = z.object({
   services: z.array(clinicServiceSchema),
   menu_items: z.array(menuItemSchema),
   business_hours: businessHoursSchema,
-  voice: z.object({
-    provider: z.string(),
-    voiceId: z.string(),
-    speed: z.number().min(0.5).max(2).optional(),
-    model: z.string().optional(),
-  }),
   language: z.string(),
-  model: z.object({ provider: z.string(), model: z.string() }),
   first_message: z.string(),
   handoff_message: z.string().optional(),
   max_appointments_per_day: z.number().int().min(1).max(100).nullable().optional(),
@@ -165,15 +169,15 @@ export const agentConfigFormSchema = z.object({
     .refine((value) => !value || E164_PHONE_REGEX.test(value), {
       message: "El WhatsApp para avisos debe tener formato internacional (ej. +5491122334455).",
     }),
+  sales_closing_enabled: z.boolean().optional(),
+  auto_follow_up_enabled: z.boolean().optional(),
+  follow_up_days: z.number().int().min(1).max(14).optional(),
 });
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 
 export const clinicDetailsSchema = z.object({
   name: z.string().min(1),
-  // VAPI usa este número como destino de la tool nativa transferCall, que exige
-  // formato E.164 (+ código de país). Se valida aquí para fallar al guardar,
-  // con un mensaje claro, en vez de fallar más tarde al publicar en VAPI.
   phone: z
     .string()
     .optional()
@@ -183,26 +187,6 @@ export const clinicDetailsSchema = z.object({
   address: z.string().optional(),
   timezone: z.string().min(1),
   business_type: z.enum(["citas", "pedidos", "restaurante", "inmobiliaria", "llamadas"]),
-});
-
-export const vapiPhoneNumberFormSchema = z.object({
-  phoneNumberId: z.string().uuid(),
-});
-
-export const vapiApiKeyFormSchema = z.object({
-  apiKey: z.string().uuid("La clave de API de VAPI no tiene el formato esperado."),
-});
-
-export const twilioImportFormSchema = z.object({
-  number: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
-  twilioAccountSid: z.string().regex(/^AC[a-zA-Z0-9]{32}$/, "Account SID de Twilio inválido (empieza con 'AC')."),
-  twilioAuthToken: z.string().min(20, "Auth Token de Twilio inválido."),
-});
-
-export const zadarmaImportFormSchema = z.object({
-  number: z.string().regex(E164_PHONE_REGEX, "El número debe estar en formato E.164, ej. +5491122334455."),
-  sipUsername: z.string().min(1, "Ingresá tu usuario/extensión SIP de Zadarma (ej. 1234-100)."),
-  sipPassword: z.string().min(1, "Ingresá tu contraseña SIP de Zadarma."),
 });
 
 export const whatsappCredentialsFormSchema = z.object({
@@ -215,77 +199,4 @@ export const whatsappCredentialsFormSchema = z.object({
 
 export const whatsappReplySchema = z.object({
   body: z.string().trim().min(1, "Escribí un mensaje.").max(4096, "El mensaje es demasiado largo."),
-});
-
-// ---------------------------------------------------------------------------
-// VAPI webhook envelope
-// ---------------------------------------------------------------------------
-
-export const vapiToolCallSchema = z.object({
-  id: z.string(),
-  name: z.string().nullish(),
-  parameters: z.record(z.string(), z.unknown()).nullish(),
-  arguments: z.record(z.string(), z.unknown()).nullish(),
-  function: z
-    .object({
-      name: z.string(),
-      arguments: z.union([z.string(), z.record(z.string(), z.unknown())]).nullish(),
-    })
-    .nullish(),
-});
-
-// VAPI manda explícitamente `null` en muchos campos ausentes (en vez de
-// omitirlos) — ej. `call.assistantId: null` en el evento assistant-request de
-// números sin assistant fijo (que es como funcionan todos nuestros números).
-// `.optional()` de Zod NO acepta `null`, solo `undefined`, así que un solo
-// campo con `.optional()` en vez de `.nullish()` acá rompe TODA la validación
-// del payload — confirmado en producción: causó "assistant-request-returned-error"
-// en el 100% de las llamadas entrantes.
-export const vapiWebhookMessageSchema = z.object({
-  message: z.object({
-    type: z.string(),
-    call: z
-      .object({
-        id: z.string().nullish(),
-        phoneNumberId: z.string().nullish(),
-        assistantId: z.string().nullish(),
-        // "inboundPhoneCall" | "outboundPhoneCall" (también hay "webCall") — para distinguir dirección en el panel de CRM.
-        type: z.string().nullish(),
-        customer: z.object({ number: z.string().nullish() }).nullish(),
-        // Presente en el evento assistant-request (todavía no existe `id`/`phoneNumberId` planos en esa etapa).
-        phoneNumber: z.object({ id: z.string().nullish(), number: z.string().nullish() }).nullish(),
-      })
-      .nullish(),
-    // Presente en tool-calls disparados desde la Chat API (ej. WhatsApp) en vez de una llamada.
-    chat: z
-      .object({
-        id: z.string().nullish(),
-        assistantId: z.string().nullish(),
-      })
-      .nullish(),
-    toolCallList: z.array(vapiToolCallSchema).nullish(),
-    toolCalls: z.array(vapiToolCallSchema).nullish(),
-    endedReason: z.string().nullish(),
-    artifact: z
-      .object({
-        transcript: z.string().nullish(),
-        messages: z
-          .array(
-            z.object({
-              role: z.string().nullish(),
-              message: z.string().nullish(),
-            })
-          )
-          .nullish(),
-      })
-      .nullish(),
-    analysis: z
-      .object({
-        summary: z.string().nullish(),
-      })
-      .nullish(),
-    cost: z.number().nullish(),
-    startedAt: z.string().nullish(),
-    endedAt: z.string().nullish(),
-  }),
 });

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { decrypt, encrypt } from "@/lib/crypto";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/types/database";
+import type { Database, WhatsappConnectionMethod } from "@/types/database";
 
 export interface WhatsappCredentialsInput {
   whatsappNumber: string;
@@ -15,7 +15,7 @@ export interface DecryptedWhatsappCredentials {
   whatsappNumber: string;
   metaPhoneNumberId: string;
   metaAccessToken: string;
-  metaVerifyToken: string;
+  metaVerifyToken: string | null;
 }
 
 /**
@@ -34,12 +34,14 @@ export async function saveWhatsappCredentials(input: WhatsappCredentialsInput): 
     whatsapp_number: string;
     meta_phone_number_id: string;
     meta_verify_token: string;
+    connection_method: WhatsappConnectionMethod;
     meta_access_token_encrypted?: string;
   } = {
     clinic_id: clinic.id,
     whatsapp_number: input.whatsappNumber,
     meta_phone_number_id: input.metaPhoneNumberId,
     meta_verify_token: encrypt(input.metaVerifyToken),
+    connection_method: "manual",
   };
 
   if (input.metaAccessToken) {
@@ -66,7 +68,8 @@ export async function hasWhatsappCredentials(clinicId: string, supabase: Supabas
 export interface WhatsappCredentialsSummary {
   whatsappNumber: string;
   metaPhoneNumberId: string;
-  metaVerifyToken: string;
+  metaVerifyToken: string | null;
+  connectionMethod: WhatsappConnectionMethod;
 }
 
 /** Datos ya guardados, no secretos, para precargar el formulario de Integraciones (el Access Token nunca se muestra). */
@@ -76,14 +79,15 @@ export async function getWhatsappCredentialsSummary(
 ): Promise<WhatsappCredentialsSummary | null> {
   const { data } = await supabase
     .from("whatsapp_credentials")
-    .select("whatsapp_number, meta_phone_number_id, meta_verify_token")
+    .select("whatsapp_number, meta_phone_number_id, meta_verify_token, connection_method")
     .eq("clinic_id", clinicId)
     .maybeSingle();
   if (!data) return null;
   return {
     whatsappNumber: data.whatsapp_number,
     metaPhoneNumberId: data.meta_phone_number_id,
-    metaVerifyToken: decrypt(data.meta_verify_token),
+    metaVerifyToken: data.meta_verify_token ? decrypt(data.meta_verify_token) : null,
+    connectionMethod: data.connection_method,
   };
 }
 
@@ -104,7 +108,7 @@ export async function getWhatsappCredentialsByPhoneNumberId(
     whatsappNumber: data.whatsapp_number,
     metaPhoneNumberId: data.meta_phone_number_id,
     metaAccessToken: decrypt(data.meta_access_token_encrypted),
-    metaVerifyToken: decrypt(data.meta_verify_token),
+    metaVerifyToken: data.meta_verify_token ? decrypt(data.meta_verify_token) : null,
   };
 }
 
@@ -124,17 +128,18 @@ export async function getOwnWhatsappCredentials(
     whatsappNumber: data.whatsapp_number,
     metaPhoneNumberId: data.meta_phone_number_id,
     metaAccessToken: decrypt(data.meta_access_token_encrypted),
-    metaVerifyToken: decrypt(data.meta_verify_token),
+    metaVerifyToken: data.meta_verify_token ? decrypt(data.meta_verify_token) : null,
   };
 }
 
-/** Busca, entre todos los negocios, el que tenga este verify token — usado en la verificación GET del webhook de Meta. */
+/** Busca, entre todos los negocios, el que tenga este verify token — usado en la verificación GET del webhook de Meta (clínicas conectadas a mano, cada una con su propio Meta App y su propio token; las conectadas por Facebook Login comparten un token de app único, ver META_WEBHOOK_VERIFY_TOKEN). */
 export async function findClinicByVerifyToken(
   verifyToken: string,
   supabase: SupabaseClient<Database>
 ): Promise<string | null> {
   const { data } = await supabase.from("whatsapp_credentials").select("clinic_id, meta_verify_token");
   const match = (data ?? []).find((row) => {
+    if (!row.meta_verify_token) return false;
     try {
       return decrypt(row.meta_verify_token) === verifyToken;
     } catch {
@@ -142,4 +147,36 @@ export async function findClinicByVerifyToken(
     }
   });
   return match?.clinic_id ?? null;
+}
+
+export interface SaveEmbeddedSignupInput {
+  clinicId: string;
+  wabaId: string;
+  businessId: string;
+  phoneNumberId: string;
+  whatsappNumber: string;
+  accessToken: string;
+  twoStepPin: string;
+}
+
+/** Guarda las credenciales obtenidas por Login con Facebook (Embedded Signup) — mismo destino que el formulario manual, pero sin verify token propio (usa el de la app) y marcando el método de conexión. */
+export async function saveEmbeddedSignupCredentials(
+  supabase: SupabaseClient<Database>,
+  input: SaveEmbeddedSignupInput
+): Promise<void> {
+  const { error } = await supabase.from("whatsapp_credentials").upsert(
+    {
+      clinic_id: input.clinicId,
+      whatsapp_number: input.whatsappNumber,
+      meta_phone_number_id: input.phoneNumberId,
+      meta_access_token_encrypted: encrypt(input.accessToken),
+      meta_waba_id: input.wabaId,
+      meta_business_id: input.businessId,
+      meta_two_step_pin_encrypted: encrypt(input.twoStepPin),
+      meta_verify_token: null,
+      connection_method: "oauth",
+    },
+    { onConflict: "clinic_id" }
+  );
+  if (error) throw error;
 }

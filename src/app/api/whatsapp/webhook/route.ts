@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { constantTimeEqual } from "@/lib/crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrCreateWhatsappSession } from "@/lib/whatsapp/chat";
 import { findClinicByVerifyToken, getWhatsappCredentialsByPhoneNumberId } from "@/lib/whatsapp/credentials";
@@ -21,6 +22,15 @@ export async function GET(request: NextRequest) {
 
   if (mode !== "subscribe" || !token || !challenge) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  // Las clínicas conectadas por Login con Facebook comparten un solo verify
+  // token de la app (configurado una vez en el dashboard de Meta) en vez de
+  // uno propio — se chequea primero para no hacer el barrido por todas las
+  // clínicas conectadas a mano en ese caso.
+  const sharedToken = process.env.META_WEBHOOK_VERIFY_TOKEN;
+  if (sharedToken && constantTimeEqual(token, sharedToken)) {
+    return new NextResponse(challenge, { status: 200 });
   }
 
   const admin = createAdminClient();

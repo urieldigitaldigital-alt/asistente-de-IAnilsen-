@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Asistente Nilsen IA",
     short_name: "Nilsen IA",
-    description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+    description: "Panel de gestión del asistente de IA por WhatsApp para negocios con agendamiento de citas",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#0a0d12",

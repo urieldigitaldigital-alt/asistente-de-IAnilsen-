@@ -3,6 +3,9 @@ export type ProfileRole = "owner" | "staff";
 export type TranscriptRole = "assistant" | "user";
 export type WhatsappConversationStatus = "active" | "needs_follow_up" | "resolved";
 export type WhatsappMessageRole = "customer" | "assistant" | "business";
+export type WhatsappConnectionMethod = "manual" | "oauth";
+export type ClosedClientStatus = "nuevo" | "en_onboarding" | "activo";
+export type LeadInterestLevel = "sin_evaluar" | "interesado" | "no_interesado";
 export type BusinessType = "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
 export type OrderType = "pickup" | "delivery";
 export type OrderStatus = "recibido" | "en_preparacion" | "listo" | "entregado" | "cancelado";
@@ -118,6 +121,9 @@ export interface Database {
           vapi_phone_number_id: string | null;
           max_appointments_per_day: number | null;
           owner_notification_phone: string | null;
+          sales_closing_enabled: boolean;
+          auto_follow_up_enabled: boolean;
+          follow_up_days: number;
           updated_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["agent_configs"]["Row"]> & {
@@ -165,7 +171,11 @@ export interface Database {
           whatsapp_number: string;
           meta_phone_number_id: string;
           meta_access_token_encrypted: string;
-          meta_verify_token: string;
+          meta_verify_token: string | null;
+          meta_waba_id: string | null;
+          meta_business_id: string | null;
+          meta_two_step_pin_encrypted: string | null;
+          connection_method: WhatsappConnectionMethod;
           updated_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]> & {
@@ -173,7 +183,6 @@ export interface Database {
           whatsapp_number: string;
           meta_phone_number_id: string;
           meta_access_token_encrypted: string;
-          meta_verify_token: string;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_credentials"]["Row"]>;
         Relationships: [];
@@ -185,8 +194,10 @@ export interface Database {
           customer_phone: string;
           customer_name: string | null;
           status: WhatsappConversationStatus;
+          interest_level: LeadInterestLevel;
           last_message_at: string;
           pending_reply_at: string | null;
+          followed_up_at: string | null;
           updated_at: string;
           created_at: string;
         };
@@ -438,6 +449,29 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Row"]>;
         Relationships: [];
       };
+      closed_clients: {
+        Row: {
+          id: string;
+          clinic_id: string;
+          call_id: string | null;
+          whatsapp_session_id: string | null;
+          client_name: string;
+          client_phone: string;
+          service: string;
+          notes: string | null;
+          status: ClosedClientStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["closed_clients"]["Row"]> & {
+          clinic_id: string;
+          client_name: string;
+          client_phone: string;
+          service: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["closed_clients"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -466,3 +500,4 @@ export type Property = Database["public"]["Tables"]["properties"]["Row"];
 export type PropertyVisit = Database["public"]["Tables"]["property_visits"]["Row"];
 export type Inquiry = Database["public"]["Tables"]["inquiries"]["Row"];
 export type Transcript = Database["public"]["Tables"]["transcripts"]["Row"];
+export type ClosedClient = Database["public"]["Tables"]["closed_clients"]["Row"];

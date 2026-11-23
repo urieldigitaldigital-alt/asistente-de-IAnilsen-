@@ -1,13 +1,14 @@
 # Asistente Nilsen IA
 
-SaaS multi-tenant que gestiona agentes de voz IA (VAPI) para cualquier negocio con agendamiento de citas (clínicas, salones, consultorios, spas, etc.): atienden llamadas telefónicas, agendan/consultan/cancelan citas en Google Calendar y guardan la transcripción de cada llamada. Cada negocio administra su propio agente desde un panel web (Dashboard, Calendario, Transcripciones, Personalización, Integraciones).
+SaaS multi-tenant que gestiona asistentes de IA por WhatsApp para cualquier negocio que necesite responder mensajes, agendar citas/reservas o tomar pedidos (clínicas, restaurantes, inmobiliarias, servicios, etc.): responden automáticamente, agendan/consultan/cancelan citas en Google Calendar, hacen seguimiento automático a quien no contesta y marcan el interés de cada lead. Cada negocio administra su propio asistente desde un panel web (Dashboard, Calendario, CRM, WhatsApp, Personalización, Integraciones).
 
 ## Stack
 
 - Next.js 16 (App Router, Turbopack, `proxy.ts`) + React 19.2 + TypeScript
 - Tailwind CSS v4
-- Supabase (Postgres + Auth + Row Level Security)
-- VAPI (`@vapi-ai/server-sdk`) para el agente de voz
+- Supabase (Postgres + Auth + Row Level Security + pg_cron/pg_net)
+- Claude (Anthropic SDK) para el asistente de WhatsApp
+- Meta WhatsApp Cloud API (Embedded Signup de un clic, o conexión manual)
 - Google Calendar API vía OAuth 2.0 (`googleapis`)
 - pnpm
 
@@ -15,9 +16,10 @@ SaaS multi-tenant que gestiona agentes de voz IA (VAPI) para cualquier negocio c
 
 - Node.js ≥ 20.9
 - pnpm (`corepack enable` si no lo tienes instalado globalmente)
-- Un proyecto de [Supabase](https://supabase.com)
-- Una cuenta de [VAPI](https://vapi.ai) con un método de pago para comprar/crear un número
+- Un proyecto de [Supabase](https://supabase.com) con `pg_cron` y `pg_net` habilitados
+- Una App de [Meta for Developers](https://developers.facebook.com) con el producto WhatsApp
 - Un proyecto de [Google Cloud](https://console.cloud.google.com) con la Calendar API habilitada
+- Una API key de [Anthropic](https://console.anthropic.com)
 
 ## 2. Instalación
 
@@ -26,7 +28,7 @@ pnpm install
 cp .env.example .env.local
 ```
 
-Completa `.env.local` con los valores de las secciones siguientes. **Nunca** pongas estas variables en `NEXT_PUBLIC_*` salvo las que ya lo son — `SUPABASE_SERVICE_ROLE_KEY`, `VAPI_API_KEY`, `GOOGLE_CLIENT_SECRET` y `ENCRYPTION_KEY` son secretos de servidor.
+Completa `.env.local` con los valores de las secciones siguientes. **Nunca** pongas estas variables en `NEXT_PUBLIC_*` salvo las que ya lo son — `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `META_APP_SECRET`, `GOOGLE_CLIENT_SECRET` y `ENCRYPTION_KEY` son secretos de servidor.
 
 Genera `ENCRYPTION_KEY` (32 bytes para AES-256-GCM):
 
@@ -37,22 +39,26 @@ openssl rand -hex 32
 ## 3. Supabase
 
 1. Crea un proyecto en Supabase y copia `Project URL`, `anon key` y `service_role key` a `.env.local`.
-2. Corre las migraciones en `supabase/migrations/` en orden (`0001_init.sql`, `0002_handle_new_user.sql`, `0003_google_credentials_write_policies.sql`, `0004_generic_business_defaults.sql`), por ejemplo:
-   ```bash
-   supabase link --project-ref <tu-project-ref>
-   supabase db push
-   ```
-   o pégalas directamente en el **SQL Editor** del dashboard, en ese orden.
-3. Verifica que RLS quedó activo en las 7 tablas (`clinics`, `profiles`, `agent_configs`, `google_credentials`, `calls`, `appointments`, `transcripts`) — las migraciones ya lo hacen con `enable row level security` + `force row level security`.
+2. Corre las migraciones de `supabase/migrations/` en orden (pégalas en el **SQL Editor** del dashboard, un archivo a la vez).
+3. Habilita las extensiones `pg_cron` y `pg_net` (Database → Extensions), y programá los dos cron jobs documentados como comentario en `0032_whatsapp_pending_reply.sql` (respuestas demoradas, cada 1 minuto) y `0036_whatsapp_only.sql` (seguimientos automáticos, cada 6 horas) — ambos llaman a una ruta interna con el header `x-cron-secret` (`WHATSAPP_CRON_SECRET`).
 4. El trigger `on_auth_user_created` crea automáticamente el negocio, el perfil (`role='owner'`) y una configuración de agente genérica por defecto cuando alguien se registra.
 
-## 4. VAPI
+## 4. Meta (WhatsApp)
 
-1. Crea una API key en el dashboard de VAPI (`Settings > API Keys`) y ponla en `VAPI_API_KEY`.
-2. Define `VAPI_WEBHOOK_SECRET` con cualquier string aleatorio largo — la app lo manda como header `x-webhook-secret` en `assistant.server.headers` y lo valida en `POST /api/vapi/webhook` (comparación en tiempo constante). No es HMAC ni el header `x-vapi-signature`: es el mecanismo actual soportado por el schema de `server` de VAPI.
-3. Levanta la app, inicia sesión y ve a **Personalización > Publicar**. Esto crea (o actualiza) el assistant vía `POST/PATCH /assistant` con el `system_prompt` compuesto, la voz, el transcriber, las tools y `server.url = {APP_URL}/api/vapi/webhook`.
-4. Crea un número en el dashboard de VAPI (`Phone Numbers`) para ese negocio y copia su **UUID** (no el `+52...`).
-5. Ve a **Integraciones**, pega el UUID en "Asistente y número de VAPI" y da clic en **Vincular**. Esto hace `PATCH /phone-number/{id} { assistantId }` para que las llamadas entrantes lleguen al asistente.
+Hay dos formas de conectar WhatsApp, y conviven: un botón de un clic (recomendado) y un formulario manual de respaldo.
+
+### 4.1 Botón de un clic (Embedded Signup)
+
+1. Verificá tu negocio en Meta Business Manager y registrate como Meta Developer.
+2. Creá una App tipo **Business** en [developers.facebook.com](https://developers.facebook.com) → copiá el **App ID** y el **App Secret** a `META_APP_ID`/`NEXT_PUBLIC_META_APP_ID` y `META_APP_SECRET`.
+3. Agregale los productos **WhatsApp** y **Facebook Login for Business**.
+4. Dentro de Facebook Login for Business → Configuraciones, creá una de tipo **Embedded Signup** con token **"Never expires"** → copiá el **Configuration ID** a `NEXT_PUBLIC_META_CONFIG_ID`.
+5. En WhatsApp → Configuración → Webhooks: poné como Callback URL `{APP_URL}/api/whatsapp/webhook` y elegí un **Verify Token** cualquiera → ese mismo valor va en `META_WEBHOOK_VERIFY_TOKEN`. Suscribite al campo `messages`.
+6. Con eso, cualquier negocio que entre al panel y toque "Conectar con Facebook" en Integraciones queda conectado sin copiar ni pegar nada — hasta que Meta termine la revisión de la App (Advanced Access), esto solo funciona para las cuentas con rol de administrador/tester en tu App.
+
+### 4.2 Conexión manual (respaldo, por negocio)
+
+Cada negocio puede conectar su propio número a mano desde **Integraciones**, pegando `whatsapp_number`, `meta_phone_number_id`, `meta_access_token` y un `meta_verify_token` propio — útil mientras la App no tiene Advanced Access, o para negocios que ya tenían un número configurado así.
 
 ## 5. Google Cloud (OAuth de Google Calendar)
 
@@ -72,38 +78,32 @@ pnpm dev
 
 Abre [http://localhost:3000](http://localhost:3000).
 
-### Recibir webhooks de VAPI en local
+### Recibir webhooks de Meta en local
 
-VAPI necesita alcanzar tu `server.url` públicamente. Usa la CLI de VAPI + un túnel, o directamente ngrok apuntando a tu servidor Next.js:
+Meta necesita alcanzar tu webhook públicamente. Usa ngrok apuntando a tu servidor Next.js:
 
 ```bash
-# Opción simple: ngrok directo a Next.js
 ngrok http 3000
-# copia la URL pública de ngrok y ponla como APP_URL en .env.local (con /api/vapi/webhook agregado
-# automáticamente por la app), luego vuelve a "Publicar" en Personalización para que VAPI apunte ahí.
-```
-
-```bash
-# Alternativa: CLI de VAPI
-curl -sSL https://vapi.ai/install.sh | bash
-ngrok http 4242
-vapi listen --forward-to localhost:3000/api/vapi/webhook
+# copiá la URL pública de ngrok y poné esa URL + /api/whatsapp/webhook como
+# Callback URL en Meta → WhatsApp → Configuración → Webhooks.
 ```
 
 ## 7. Notas de seguridad
 
-- `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS) solo se usa en `api/vapi/webhook` y en el flujo de Google OAuth — nunca en código de cliente ni en las vistas normales, que leen con la sesión del usuario y por tanto quedan aisladas por negocio vía RLS.
-- Los tokens de Google se cifran con AES-256-GCM (`lib/crypto.ts`) antes de guardarse.
+- `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS) solo se usa en los webhooks/crons de WhatsApp y en el flujo de Google OAuth — nunca en código de cliente ni en las vistas normales, que leen con la sesión del usuario y por tanto quedan aisladas por negocio vía RLS.
+- Los tokens de Google y las credenciales de WhatsApp se cifran con AES-256-GCM (`lib/crypto.ts`) antes de guardarse.
 - `.env.local` nunca se commitea (`.gitignore` excluye `.env*`, con excepción explícita de `.env.example`).
 
 ## Estructura relevante
 
 ```
-supabase/migrations/       Esquema SQL + RLS + trigger de registro
-src/proxy.ts                Protección de rutas (reemplaza a middleware.ts en Next 16)
-src/lib/vapi/                Cliente VAPI, prompt builder, tools, sync con la API
-src/lib/google/              OAuth + Google Calendar API
-src/app/api/vapi/webhook/    Webhook de VAPI (tool-calls, end-of-call-report)
-src/app/api/google/          OAuth callback de Google
-src/app/(app)/                Dashboard, Calendario, Transcripciones, Personalización, Integraciones
+supabase/migrations/          Esquema SQL + RLS + trigger de registro
+src/proxy.ts                  Protección de rutas (reemplaza a middleware.ts en Next 16)
+src/lib/assistant/             Prompt builder, tools, handlers — lógica del asistente, compartida
+src/lib/whatsapp/              Cliente de Meta, chat con Claude, seguimientos automáticos
+src/lib/google/                OAuth + Google Calendar API
+src/app/api/whatsapp/          Webhook de Meta, cron de respuestas demoradas y de seguimientos
+src/app/api/meta/              Intercambio del Embedded Signup (login con Facebook)
+src/app/api/google/            OAuth callback de Google
+src/app/(app)/                 Dashboard, Calendario, CRM, WhatsApp, Personalización, Integraciones
 ```

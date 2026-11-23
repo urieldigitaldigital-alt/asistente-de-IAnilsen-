@@ -1,66 +1,51 @@
 "use server";
 
-import type { Vapi } from "@vapi-ai/server-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 
-import { createClient } from "@/lib/supabase/server";
-import { getTenantVapiClient } from "@/lib/vapi/credentials";
-import { friendlyVapiError } from "@/lib/vapi/friendlyError";
+export interface SandboxChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export interface SandboxChatResult {
   reply: string;
-  chatId: string | null;
   error: string | null;
+}
+
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY no está configurada.");
+  return new Anthropic({ apiKey });
 }
 
 /**
  * Sandbox de "Probar": manda un mensaje de texto contra el system prompt
- * actual (aún sin publicar) usando el chat de VAPI, sin tools ni voz.
+ * actual (aún sin guardar), con el mismo modelo que usa WhatsApp en
+ * producción (ver lib/whatsapp/chat.ts) — sin tools ni escrituras reales, así
+ * que no agenda ni guarda nada de verdad.
  */
 export async function sendSandboxMessageAction(
   systemPrompt: string,
-  modelName: string,
-  message: string,
-  previousChatId: string | null
+  history: SandboxChatMessage[],
+  message: string
 ): Promise<SandboxChatResult> {
   if (!message.trim()) {
-    return { reply: "", chatId: previousChatId, error: "Escribe un mensaje para probar." };
+    return { reply: "", error: "Escribe un mensaje para probar." };
   }
 
   try {
-    const supabase = await createClient();
-    const { data: clinic, error: clinicError } = await supabase.from("clinics").select("id").single();
-    if (clinicError || !clinic) {
-      return { reply: "", chatId: previousChatId, error: "No se encontró el negocio del usuario." };
-    }
-
-    const vapi = await getTenantVapiClient(clinic.id, supabase);
-    const response = await vapi.chats.create({
-      input: message,
-      previousChatId: previousChatId ?? undefined,
-      assistant: previousChatId
-        ? undefined
-        : {
-            model: {
-              provider: "openai",
-              model: (modelName || "gpt-4.1") as Vapi.OpenAiModelModel,
-              messages: [{ role: "system", content: systemPrompt }],
-            },
-          },
+    const anthropic = getAnthropicClient();
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [...history, { role: "user", content: message }],
     });
 
-    if (!("output" in response)) {
-      return { reply: "", chatId: previousChatId, error: "El sandbox no soporta respuestas en streaming." };
-    }
-
-    const lastAssistantMessage = [...(response.output ?? [])].reverse().find((item) => item.role === "assistant");
-
-    return {
-      reply: (lastAssistantMessage && "content" in lastAssistantMessage && lastAssistantMessage.content) || "(sin respuesta)",
-      chatId: response.id,
-      error: null,
-    };
+    const textBlock = response.content.find((block) => block.type === "text");
+    return { reply: textBlock && textBlock.type === "text" ? textBlock.text : "(sin respuesta)", error: null };
   } catch (err) {
-    console.error("Error en sandbox de chat de VAPI:", err);
-    return { reply: "", chatId: previousChatId, error: friendlyVapiError(err, "Error al probar el prompt.") };
+    console.error("Error en sandbox de chat:", err);
+    return { reply: "", error: err instanceof Error ? err.message : "Error al probar el prompt." };
   }
 }

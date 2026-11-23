@@ -6,7 +6,7 @@ import type { Database } from "@/types/database";
  * Cliente con la service role key: bypassa RLS por completo.
  *
  * Úsalo SOLO en contextos servidor-a-servidor sin sesión de usuario
- * (webhook de VAPI, callback OAuth de Google antes de resolver la clínica).
+ * (webhooks de WhatsApp, crons, callback OAuth de Google antes de resolver la clínica).
  * Nunca lo importes desde un Client Component ni desde código que se
  * ejecute en el navegador.
  */

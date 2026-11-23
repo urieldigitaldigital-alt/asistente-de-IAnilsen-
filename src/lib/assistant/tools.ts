@@ -1,7 +1,3 @@
-import type { Vapi } from "@vapi-ai/server-sdk";
-
-type OpenAiModelToolsItem = Vapi.OpenAiModelToolsItem;
-
 export const TOOL_NAMES = {
   checkAvailability: "checkAvailability",
   bookAppointment: "bookAppointment",
@@ -14,23 +10,73 @@ export const TOOL_NAMES = {
   getProperties: "getProperties",
   scheduleVisit: "scheduleVisit",
   logInquiry: "logInquiry",
+  closeClient: "closeClient",
+  updateLeadInterest: "updateLeadInterest",
 } as const;
 
-interface BuildToolsParams {
-  receptionPhoneNumber?: string;
-  businessType?: "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
+export interface AssistantTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  };
 }
 
-/**
- * Tools que resuelven contra el webhook del asistente (`model.tools`), más
- * las tools nativas endCall (siempre) y transferCall (solo si el negocio
- * configuró un teléfono de recepción). Ninguna define `server` propio: todas
- * heredan `assistant.server.url` (ver lib/vapi/sync.ts), que es el siguiente
- * nivel de prioridad cuando una tool no trae su propio server.
- * `transferCall` es nativa de Vapi, no debe imitarse con una function tool
- * (ver skill create-tool de Vapi).
- */
-const CITAS_TOOLS: OpenAiModelToolsItem[] = [
+interface BuildToolsParams {
+  businessType?: "citas" | "pedidos" | "restaurante" | "inmobiliaria" | "llamadas";
+  /** Solo aplica a "citas": si el negocio activó "intentar cerrar clientes" en Personalización. */
+  salesClosingEnabled?: boolean;
+}
+
+const CLOSE_CLIENT_TOOL: AssistantTool = {
+  type: "function",
+  function: {
+    name: TOOL_NAMES.closeClient,
+    description:
+      "Registra que la persona confirmó que quiere empezar a trabajar con el negocio (se cerró la venta) — es distinto de agendar una llamada, es un cliente nuevo confirmado. Se puede volver a llamar en la misma conversación para sumar más notas de lo que hace falta para arrancar (ej. después de pedirle detalles de onboarding) — no crea un cliente duplicado.",
+    parameters: {
+      type: "object",
+      properties: {
+        clientName: { type: "string", description: "Nombre completo del cliente." },
+        clientPhone: { type: "string", description: "Teléfono del cliente." },
+        service: { type: "string", description: "Servicio o servicios en los que se cierra (ej. 'Publicidad paga', 'Página web', 'Asistente de IA')." },
+        notes: {
+          type: "string",
+          description:
+            "Resumen de su negocio, el problema que busca resolver, y todo lo necesario para arrancar el trabajo — se puede ir completando en mensajes sucesivos a esta misma tool a medida que se junta más información.",
+        },
+      },
+      required: ["clientName", "clientPhone", "service"],
+    },
+  },
+};
+
+const UPDATE_LEAD_INTEREST_TOOL: AssistantTool = {
+  type: "function",
+  function: {
+    name: TOOL_NAMES.updateLeadInterest,
+    description:
+      "Marca qué tan interesado está este contacto, para que aparezca bien clasificado en el panel del dueño. Llamala cuando el interés de la persona quede claro: 'interesado' si muestra ganas reales de avanzar (pregunta precios, quiere agendar, dice que le sirve), 'no_interesado' si dice explícitamente que no le interesa, que no es el momento, o pide que no le escriban más. No la llames si todavía no quedó claro — en ese caso dejalo sin marcar.",
+    parameters: {
+      type: "object",
+      properties: {
+        level: {
+          type: "string",
+          enum: ["interesado", "no_interesado"],
+          description: "Nivel de interés detectado.",
+        },
+      },
+      required: ["level"],
+    },
+  },
+};
+
+const CITAS_TOOLS: AssistantTool[] = [
   {
     type: "function",
     function: {
@@ -99,7 +145,7 @@ const CITAS_TOOLS: OpenAiModelToolsItem[] = [
   },
 ];
 
-const PEDIDOS_TOOLS: OpenAiModelToolsItem[] = [
+const PEDIDOS_TOOLS: AssistantTool[] = [
   {
     type: "function",
     function: {
@@ -142,7 +188,7 @@ const PEDIDOS_TOOLS: OpenAiModelToolsItem[] = [
   },
 ];
 
-const RESERVE_TABLE_TOOL: OpenAiModelToolsItem = {
+const RESERVE_TABLE_TOOL: AssistantTool = {
   type: "function",
   function: {
     name: TOOL_NAMES.reserveTable,
@@ -166,9 +212,9 @@ const RESERVE_TABLE_TOOL: OpenAiModelToolsItem = {
   },
 };
 
-const RESTAURANTE_TOOLS: OpenAiModelToolsItem[] = [...PEDIDOS_TOOLS, RESERVE_TABLE_TOOL];
+const RESTAURANTE_TOOLS: AssistantTool[] = [...PEDIDOS_TOOLS, RESERVE_TABLE_TOOL];
 
-const INMOBILIARIA_TOOLS: OpenAiModelToolsItem[] = [
+const INMOBILIARIA_TOOLS: AssistantTool[] = [
   {
     type: "function",
     function: {
@@ -206,12 +252,12 @@ const INMOBILIARIA_TOOLS: OpenAiModelToolsItem[] = [
   },
 ];
 
-const LLAMADAS_TOOLS: OpenAiModelToolsItem[] = [
+const CONSULTAS_TOOLS: AssistantTool[] = [
   {
     type: "function",
     function: {
       name: TOOL_NAMES.logInquiry,
-      description: "Anota la consulta del cliente y su teléfono para que alguien del negocio lo llame. Usar siempre antes de despedirse.",
+      description: "Anota la consulta del cliente y su teléfono para que alguien del negocio lo contacte. Usar siempre antes de despedirse.",
       parameters: {
         type: "object",
         properties: {
@@ -225,7 +271,7 @@ const LLAMADAS_TOOLS: OpenAiModelToolsItem[] = [
   },
 ];
 
-function domainTools(businessType: NonNullable<BuildToolsParams["businessType"]>): OpenAiModelToolsItem[] {
+function domainTools(businessType: NonNullable<BuildToolsParams["businessType"]>): AssistantTool[] {
   switch (businessType) {
     case "pedidos":
       return PEDIDOS_TOOLS;
@@ -234,18 +280,20 @@ function domainTools(businessType: NonNullable<BuildToolsParams["businessType"]>
     case "inmobiliaria":
       return INMOBILIARIA_TOOLS;
     case "llamadas":
-      return LLAMADAS_TOOLS;
+      return CONSULTAS_TOOLS;
     case "citas":
     default:
       return CITAS_TOOLS;
   }
 }
 
-export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelToolsItem[] {
-  const { receptionPhoneNumber, businessType = "citas" } = params;
+export function buildAssistantTools(params: BuildToolsParams = {}): AssistantTool[] {
+  const { businessType = "citas", salesClosingEnabled } = params;
 
-  const tools: OpenAiModelToolsItem[] = [
+  return [
     ...domainTools(businessType),
+    ...(businessType === "citas" && salesClosingEnabled ? [CLOSE_CLIENT_TOOL] : []),
+    UPDATE_LEAD_INTEREST_TOOL,
     {
       type: "function",
       function: {
@@ -258,7 +306,7 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
       type: "function",
       function: {
         name: TOOL_NAMES.requestHumanHandoff,
-        description: "Registra que la llamada necesita atención humana (además de, o en vez de, transferir la llamada).",
+        description: "Registra que la conversación necesita atención humana.",
         parameters: {
           type: "object",
           properties: {
@@ -267,25 +315,5 @@ export function buildAssistantTools(params: BuildToolsParams = {}): OpenAiModelT
         },
       },
     },
-    {
-      type: "endCall",
-      messages: [{ type: "request-start", content: "Gracias por su llamada, que tenga buen día." }],
-    },
   ];
-
-  if (receptionPhoneNumber) {
-    tools.push({
-      type: "transferCall",
-      destinations: [
-        {
-          type: "number",
-          number: receptionPhoneNumber,
-          message: "Le comunico con recepción, un momento por favor.",
-          description: "Transferir a recepción cuando el cliente lo pida explícitamente o haya una urgencia que el asistente no pueda resolver.",
-        },
-      ],
-    });
-  }
-
-  return tools;
 }

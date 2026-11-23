@@ -18,7 +18,7 @@ export default async function CustomizePage() {
       <div>
         <h1 className="text-xl font-semibold">Personalización</h1>
         <p className="text-sm text-muted">
-          Edita el prompt, la información del negocio y la configuración del agente de voz.
+          Edita el prompt, la información del negocio y la configuración del asistente.
         </p>
       </div>
       <AgentConfigForm clinic={clinic} config={config} />

@@ -15,7 +15,7 @@ export function CallsChart({ data, secondaryLabel = "Citas agendadas" }: { data:
 
   return (
     <div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label={`Llamadas y ${secondaryLabel.toLowerCase()} en los últimos 7 días`}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label={`Mensajes de WhatsApp y ${secondaryLabel.toLowerCase()} en los últimos 7 días`}>
         {data.map((point, i) => {
           const groupX = PADDING + i * groupWidth;
           return (
@@ -50,7 +50,7 @@ export function CallsChart({ data, secondaryLabel = "Citas agendadas" }: { data:
       </svg>
       <div className="mt-2 flex items-center justify-center gap-4 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-primary/70" /> Llamadas
+          <span className="h-2 w-2 rounded-full bg-primary/70" /> Mensajes
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-primary" /> {secondaryLabel}

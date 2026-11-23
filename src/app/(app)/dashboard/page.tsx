@@ -1,12 +1,10 @@
 import {
   CalendarCheckIcon,
   ChatsCircleIcon,
-  ClockIcon,
   CookingPotIcon,
   ForkKnifeIcon,
-  PhoneIcon,
+  HouseLineIcon,
   PhoneCallIcon,
-  TrendUpIcon,
   WarningCircleIcon,
   WhatsappLogoIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -17,23 +15,27 @@ import { InquiriesList } from "@/components/dashboard/InquiriesList";
 import { IntegrationStatus } from "@/components/dashboard/IntegrationStatus";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { RecentCalls } from "@/components/dashboard/RecentCalls";
 import { Card } from "@/components/ui/Card";
 import { StatTile } from "@/components/ui/StatTile";
 import { getDashboardData } from "@/lib/dashboardData";
 import { createClient } from "@/lib/supabase/server";
+import { getWhatsappCredentialsSummary } from "@/lib/whatsapp/credentials";
 
 export const metadata: Metadata = { title: "Dashboard — Asistente Nilsen IA" };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const data = await getDashboardData(supabase);
+  const [data, { data: clinic }] = await Promise.all([
+    getDashboardData(supabase),
+    supabase.from("clinics").select("id").single(),
+  ]);
+  const whatsappSummary = clinic ? await getWhatsappCredentialsSummary(clinic.id, supabase) : null;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted">Resumen de la actividad del agente de voz.</p>
+        <p className="text-sm text-muted">Resumen de la actividad del asistente de WhatsApp.</p>
       </div>
 
       <div>
@@ -42,43 +44,22 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={PhoneIcon} label="Llamadas hoy" value={String(data.callsToday)} />
+        <StatTile icon={WhatsappLogoIcon} label="Mensajes hoy" value={String(data.whatsappMessagesToday)} />
+        <StatTile icon={ChatsCircleIcon} label="Conversaciones activas" value={String(data.whatsappConversationsActive)} />
         {data.businessType === "pedidos" || data.businessType === "restaurante" ? (
           <>
             <StatTile icon={ForkKnifeIcon} label="Pedidos hoy" value={String(data.ordersToday)} />
             <StatTile icon={CookingPotIcon} label="En preparación" value={String(data.ordersInPreparation)} />
-            <StatTile icon={TrendUpIcon} label="Listos para entregar" value={String(data.ordersReady)} />
           </>
         ) : data.businessType === "llamadas" ? (
           <>
             <StatTile icon={PhoneCallIcon} label="Consultas hoy" value={String(data.inquiriesToday)} />
             <StatTile icon={WarningCircleIcon} label="Sin contactar" value={String(data.inquiriesPending)} />
-            <StatTile
-              icon={ClockIcon}
-              label="Duración promedio"
-              value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
-            />
           </>
-        ) : data.businessType === "citas" ? (
-          <>
-            <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.appointmentsScheduled)} />
-            <StatTile
-              icon={ClockIcon}
-              label="Duración promedio"
-              value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
-            />
-            <StatTile
-              icon={TrendUpIcon}
-              label="Tasa de agendamiento"
-              value={data.bookingRatePct !== null ? `${data.bookingRatePct}%` : "—"}
-            />
-          </>
+        ) : data.businessType === "inmobiliaria" ? (
+          <StatTile icon={HouseLineIcon} label="Visitas pendientes" value={String(data.visitsScheduled)} />
         ) : (
-          <StatTile
-            icon={ClockIcon}
-            label="Duración promedio"
-            value={data.avgDurationMinutes ? `${data.avgDurationMinutes.toFixed(1)} min` : "—"}
-          />
+          <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.appointmentsScheduled)} />
         )}
       </div>
 
@@ -91,25 +72,12 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <h2 className="mb-3 text-sm font-semibold">WhatsApp</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatTile icon={ChatsCircleIcon} label="Mensajes hoy" value={String(data.whatsappMessagesToday)} />
-          <StatTile icon={WhatsappLogoIcon} label="Conversaciones activas" value={String(data.whatsappConversationsActive)} />
-          <StatTile icon={WarningCircleIcon} label="Necesitan seguimiento" value={String(data.whatsappNeedsFollowUp)} />
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <h2 className="mb-2 text-sm font-semibold">Actividad reciente</h2>
           <RecentActivity items={data.recentActivity} />
         </Card>
-        <IntegrationStatus
-          googleConnected={data.googleConnected}
-          vapiAssistantId={data.vapiAssistantId}
-          vapiPhoneNumberId={data.vapiPhoneNumberId}
-        />
+        <IntegrationStatus googleConnected={data.googleConnected} whatsappConnected={Boolean(whatsappSummary)} />
       </div>
 
       <Card>
@@ -126,11 +94,6 @@ export default async function DashboardPage() {
                   : "Citas agendadas"
           }
         />
-      </Card>
-
-      <Card>
-        <h2 className="mb-2 text-sm font-semibold">Últimas llamadas</h2>
-        <RecentCalls calls={data.recentCalls} />
       </Card>
     </div>
   );

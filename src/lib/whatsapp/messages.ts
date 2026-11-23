@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, WhatsappConversationStatus, WhatsappMessageRole } from "@/types/database";
+import type { Database, LeadInterestLevel, WhatsappConversationStatus, WhatsappMessageRole } from "@/types/database";
 
 /**
  * Guarda un mensaje (del cliente o del asistente) y actualiza la fecha del
@@ -34,5 +34,15 @@ export async function updateConversationStatus(
   status: WhatsappConversationStatus
 ): Promise<void> {
   const { error } = await supabase.from("whatsapp_sessions").update({ status }).eq("id", sessionId);
+  if (error) throw error;
+}
+
+/** Marca a mano el nivel de interés de un lead (el asistente también lo marca solo durante la charla). */
+export async function updateConversationInterest(
+  supabase: SupabaseClient<Database>,
+  sessionId: string,
+  interestLevel: LeadInterestLevel
+): Promise<void> {
+  const { error } = await supabase.from("whatsapp_sessions").update({ interest_level: interestLevel }).eq("id", sessionId);
   if (error) throw error;
 }

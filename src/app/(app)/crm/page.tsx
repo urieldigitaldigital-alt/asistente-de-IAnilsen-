@@ -1,15 +1,8 @@
-import {
-  CalendarCheckIcon,
-  ChatCircleTextIcon,
-  PhoneIncomingIcon,
-  PhoneOutgoingIcon,
-  UsersThreeIcon,
-} from "@phosphor-icons/react/dist/ssr";
+import { CalendarCheckIcon, ChatCircleTextIcon, UsersThreeIcon } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LeadStatusActions } from "@/components/crm/LeadStatusActions";
-import { OutboundCallsPanel } from "@/components/crm/OutboundCallsPanel";
 import { PushNotificationToggle } from "@/components/crm/PushNotificationToggle";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatTile } from "@/components/ui/StatTile";
@@ -88,24 +81,20 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">CRM</h1>
-          <p className="text-sm text-muted">Actividad de prospección: mensajes, llamadas y reuniones agendadas con leads.</p>
+          <p className="text-sm text-muted">Actividad de prospección: mensajes y citas agendadas con leads.</p>
           <p className="mt-1 text-sm text-muted">
             Hoy: <span className="font-medium text-foreground">{scheduledToday}</span>
-            {maxPerDay ? ` de ${maxPerDay} llamadas agendadas` : " llamadas agendadas"}
+            {maxPerDay ? ` de ${maxPerDay} citas agendadas` : " citas agendadas"}
           </p>
         </div>
         <PushNotificationToggle />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile icon={ChatCircleTextIcon} label="Mensajes enviados" value={String(data.messagesSent)} />
         <StatTile icon={ChatCircleTextIcon} label="Mensajes recibidos" value={String(data.messagesReceived)} />
-        <StatTile icon={PhoneIncomingIcon} label="Llamadas entrantes" value={String(data.callsInbound)} />
-        <StatTile icon={PhoneOutgoingIcon} label="Llamadas salientes" value={String(data.callsOutbound)} />
-        <StatTile icon={CalendarCheckIcon} label="Reuniones agendadas" value={String(data.meetingsScheduled)} />
+        <StatTile icon={CalendarCheckIcon} label="Citas agendadas" value={String(data.meetingsScheduled)} />
       </div>
-
-      <OutboundCallsPanel />
 
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -130,7 +119,7 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
           <EmptyState
             icon={UsersThreeIcon}
             title={data.leads.length === 0 ? "Todavía no hay agendas registradas" : "No hay agendas en este filtro"}
-            description="En cuanto alguien agende una reunión por llamada o WhatsApp, va a aparecer acá."
+            description="En cuanto alguien agende una cita por WhatsApp, va a aparecer acá."
           />
         ) : (
           <div className="overflow-x-auto">

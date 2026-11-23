@@ -71,7 +71,7 @@ export function ClinicInfoForm({
             <option value="pedidos">Pedidos (rotisería, delivery, sin mesas)</option>
             <option value="restaurante">Restaurante (carta + mesas y reservas)</option>
             <option value="inmobiliaria">Inmobiliaria (propiedades y visitas)</option>
-            <option value="llamadas">Llamadas (solo toma consultas y teléfono)</option>
+            <option value="llamadas">Consultas generales (otro tipo de negocio/servicio)</option>
           </select>
           <p className="mt-1 text-xs text-muted">
             Define qué hace el asistente y qué pantallas ves en el panel — cambiarlo actualiza ambos.

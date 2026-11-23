@@ -8,14 +8,6 @@ export interface DashboardChartPoint {
   secondary: number;
 }
 
-export interface DashboardRecentCall {
-  id: string;
-  when: string | null;
-  phoneNumber: string | null;
-  status: string | null;
-  summary: string | null;
-}
-
 export interface DashboardInquiry {
   id: string;
   customerName: string | null;
@@ -27,7 +19,7 @@ export interface DashboardInquiry {
 
 export interface DashboardActivityItem {
   id: string;
-  type: "call" | "whatsapp" | "booking";
+  type: "whatsapp" | "booking";
   title: string;
   subtitle: string | null;
   when: string;
@@ -35,22 +27,16 @@ export interface DashboardActivityItem {
 
 export interface DashboardData {
   businessType: BusinessType;
-  callsToday: number;
-  callsWeek: number;
-  appointmentsScheduled: number;
-  avgDurationMinutes: number | null;
-  bookingRatePct: number | null;
   chart: DashboardChartPoint[];
-  recentCalls: DashboardRecentCall[];
   googleConnected: boolean;
-  vapiAssistantId: string | null;
-  vapiPhoneNumberId: string | null;
   whatsappMessagesToday: number;
   whatsappConversationsActive: number;
   whatsappNeedsFollowUp: number;
+  appointmentsScheduled: number;
   ordersToday: number;
   ordersInPreparation: number;
   ordersReady: number;
+  visitsScheduled: number;
   inquiriesToday: number;
   inquiriesPending: number;
   recentInquiries: DashboardInquiry[];
@@ -133,13 +119,9 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
   })();
 
   const [
-    callsTodayRes,
-    callsWeekRes,
     appointmentsScheduledRes,
-    weekCallsRes,
+    weekMessagesRes,
     weekSecondaryRes,
-    recentCallsRes,
-    configRes,
     googleRes,
     whatsappMessagesTodayRes,
     whatsappActiveRes,
@@ -147,23 +129,16 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     ordersTodayRes,
     ordersInPreparationRes,
     ordersReadyRes,
+    visitsScheduledRes,
     inquiriesTodayRes,
     inquiriesPendingRes,
     recentInquiriesRes,
     recentBookingsRes,
     recentWhatsappRes,
   ] = await Promise.all([
-    supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
-    supabase.from("calls").select("id", { count: "exact", head: true }).gte("created_at", weekStart.toISOString()),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
-    supabase.from("calls").select("created_at, started_at, ended_at").gte("created_at", weekStart.toISOString()),
+    supabase.from("whatsapp_messages").select("created_at").eq("role", "customer").gte("created_at", weekStart.toISOString()),
     weekSecondaryQuery,
-    supabase
-      .from("calls")
-      .select("id, started_at, created_at, phone_number, status, summary")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase.from("agent_configs").select("vapi_assistant_id, vapi_phone_number_id").single(),
     supabase.from("google_credentials").select("clinic_id").maybeSingle(),
     supabase.from("whatsapp_messages").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("whatsapp_sessions").select("id", { count: "exact", head: true }).eq("status", "active"),
@@ -171,6 +146,7 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "en_preparacion"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "listo"),
+    supabase.from("property_visits").select("id", { count: "exact", head: true }).eq("status", "pendiente"),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).gte("created_at", todayStart.toISOString()),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("contacted", false),
     supabase
@@ -187,25 +163,16 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
       .limit(5),
   ]);
 
-  const weekCalls = weekCallsRes.data ?? [];
+  const weekMessages = weekMessagesRes.data ?? [];
   const weekSecondary = (weekSecondaryRes.data as { created_at: string }[] | null) ?? [];
-
-  const durations = weekCalls
-    .filter((call) => call.started_at && call.ended_at)
-    .map((call) => (new Date(call.ended_at as string).getTime() - new Date(call.started_at as string).getTime()) / 60_000)
-    .filter((minutes) => minutes > 0 && minutes < 120);
-  const avgDurationMinutes = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
-
-  const callsWeekCount = callsWeekRes.count ?? 0;
-  const bookingRatePct = callsWeekCount > 0 ? Math.round((weekSecondary.length / callsWeekCount) * 100) : null;
 
   const buckets = new Map<string, { calls: number; secondary: number }>();
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart.getTime() + i * 24 * 60 * 60_000);
     buckets.set(dayKey(day), { calls: 0, secondary: 0 });
   }
-  for (const call of weekCalls) {
-    const key = dayKey(new Date(call.created_at));
+  for (const message of weekMessages) {
+    const key = dayKey(new Date(message.created_at));
     const bucket = buckets.get(key);
     if (bucket) bucket.calls += 1;
   }
@@ -220,18 +187,10 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     ...value,
   }));
 
-  const recentCalls: DashboardRecentCall[] = (recentCallsRes.data ?? []).map((call) => ({
-    id: call.id,
-    when: call.started_at ?? call.created_at,
-    phoneNumber: call.phone_number,
-    status: call.status,
-    summary: call.summary,
-  }));
-
-  // "Actividad reciente": une llamadas + mensajes de WhatsApp + el evento
-  // "importante" del rubro (cita/pedido/visita/consulta) en una sola línea de
-  // tiempo — cada rubro guarda ese evento en una tabla distinta, así que se
-  // arma con un shape laxo en vez de forzar un tipo único.
+  // "Actividad reciente": une mensajes de WhatsApp + el evento "importante"
+  // del rubro (cita/pedido/visita/consulta) en una sola línea de tiempo —
+  // cada rubro guarda ese evento en una tabla distinta, así que se arma con
+  // un shape laxo en vez de forzar un tipo único.
   type RawBookingRow = {
     id: string;
     patient_name?: string;
@@ -248,14 +207,6 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
     ? await supabase.from("whatsapp_sessions").select("id, customer_name, customer_phone").in("id", whatsappSessionIds)
     : { data: [] as { id: string; customer_name: string | null; customer_phone: string }[] };
   const sessionLabelById = new Map((sessionsForActivity ?? []).map((s) => [s.id, s.customer_name || s.customer_phone]));
-
-  const callActivity: DashboardActivityItem[] = (recentCallsRes.data ?? []).map((call) => ({
-    id: `call-${call.id}`,
-    type: "call",
-    title: call.phone_number ?? "Número desconocido",
-    subtitle: call.summary,
-    when: call.started_at ?? call.created_at,
-  }));
 
   const whatsappActivity: DashboardActivityItem[] = whatsappMessageRows.map((m) => ({
     id: `wa-${m.id}`,
@@ -289,28 +240,22 @@ export async function getDashboardData(supabase: SupabaseClient<Database>): Prom
           when: row.created_at,
         }));
 
-  const recentActivity = [...callActivity, ...whatsappActivity, ...bookingActivity]
+  const recentActivity = [...whatsappActivity, ...bookingActivity]
     .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
     .slice(0, 8);
 
   return {
     businessType,
-    callsToday: callsTodayRes.count ?? 0,
-    callsWeek: callsWeekCount,
-    appointmentsScheduled: appointmentsScheduledRes.count ?? 0,
-    avgDurationMinutes,
-    bookingRatePct,
     chart,
-    recentCalls,
     googleConnected: Boolean(googleRes.data),
-    vapiAssistantId: configRes.data?.vapi_assistant_id ?? null,
-    vapiPhoneNumberId: configRes.data?.vapi_phone_number_id ?? null,
     whatsappMessagesToday: whatsappMessagesTodayRes.count ?? 0,
     whatsappConversationsActive: whatsappActiveRes.count ?? 0,
     whatsappNeedsFollowUp: whatsappFollowUpRes.count ?? 0,
+    appointmentsScheduled: appointmentsScheduledRes.count ?? 0,
     ordersToday: ordersTodayRes.count ?? 0,
     ordersInPreparation: ordersInPreparationRes.count ?? 0,
     ordersReady: ordersReadyRes.count ?? 0,
+    visitsScheduled: visitsScheduledRes.count ?? 0,
     inquiriesToday: inquiriesTodayRes.count ?? 0,
     inquiriesPending: inquiriesPendingRes.count ?? 0,
     recentInquiries: (recentInquiriesRes.data ?? []).map((row) => ({

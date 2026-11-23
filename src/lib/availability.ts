@@ -78,8 +78,8 @@ const OFFSET_SUFFIX_REGEX = /(Z|[+-]\d{2}:?\d{2})$/i;
 const NAIVE_DATETIME_REGEX = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
 
 /**
- * Parsea una fecha/hora recibida de una tool de VAPI (el modelo casi nunca
- * incluye offset/"Z", aunque el prompt se lo pida). Si trae offset, se
+ * Parsea una fecha/hora recibida de una tool del asistente (el modelo casi
+ * nunca incluye offset/"Z", aunque el prompt se lo pida). Si trae offset, se
  * interpreta tal cual; si no, se interpreta como hora de pared en la
  * timezone del negocio (que es lo que un cliente/agente quieren decir al
  * hablar de "las 3 de la tarde"), evitando el corrimiento de horas que daría

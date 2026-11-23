@@ -22,7 +22,7 @@ const SITE_URL = "https://www.asistentnilsenia.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Asistente Nilsen IA",
-  description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+  description: "Panel de gestión del asistente de IA por WhatsApp para negocios con agendamiento de citas",
   // Declarar "icon" a mano en vez de dejar que src/app/icon.png se detecte
   // solo: al definir "icons" acá (por el "apple" de abajo), Next deja de
   // autogenerar el <link rel="icon"> del ícono por convención de archivo —
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   // en resultados de búsqueda, y WhatsApp/redes sociales al compartir el link.
   openGraph: {
     title: "Asistente Nilsen IA",
-    description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+    description: "Panel de gestión del asistente de IA por WhatsApp para negocios con agendamiento de citas",
     url: SITE_URL,
     siteName: "Asistente Nilsen IA",
     images: [{ url: "/logo.png", width: 1254, height: 1254, alt: "Asistente Nilsen IA" }],
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "Asistente Nilsen IA",
-    description: "Panel de gestión del agente de voz IA para negocios con agendamiento de citas",
+    description: "Panel de gestión del asistente de IA por WhatsApp para negocios con agendamiento de citas",
     images: ["/logo.png"],
   },
 };

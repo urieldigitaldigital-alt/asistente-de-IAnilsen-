@@ -1,7 +1,6 @@
 "use client";
 
 import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { cancelAppointmentAction } from "@/actions/appointments";
@@ -56,11 +55,6 @@ export function AppointmentRow({ appointment, timeZone }: { appointment: Appoint
             </p>
           )}
           <div className="flex flex-wrap gap-4 pt-1">
-            {appointment.call_id && (
-              <Link href={`/transcripciones/${appointment.call_id}`} className="font-medium text-primary hover:underline">
-                Ver transcripción
-              </Link>
-            )}
             {appointment.google_event_link && (
               <a
                 href={appointment.google_event_link}

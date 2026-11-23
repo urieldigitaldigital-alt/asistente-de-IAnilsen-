@@ -3,17 +3,32 @@
 import { ChatsCircleIcon, PaperPlaneRightIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { sendWhatsappReplyAction, updateWhatsappStatusAction } from "@/actions/whatsapp";
+import { sendWhatsappReplyAction, updateWhatsappInterestAction, updateWhatsappStatusAction } from "@/actions/whatsapp";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
-import type { WhatsappConversationStatus, WhatsappMessage, WhatsappSession } from "@/types/database";
+import type { LeadInterestLevel, WhatsappConversationStatus, WhatsappMessage, WhatsappSession } from "@/types/database";
 
 const STATUS_CONFIG: Record<WhatsappConversationStatus, { label: string; tone: "neutral" | "warning" | "success" }> = {
   active: { label: "Activa", tone: "neutral" },
   needs_follow_up: { label: "Necesita seguimiento", tone: "warning" },
   resolved: { label: "Resuelta", tone: "success" },
 };
+
+const INTEREST_CONFIG: Record<LeadInterestLevel, { label: string; tone: "neutral" | "success" | "danger" }> = {
+  sin_evaluar: { label: "Sin evaluar", tone: "neutral" },
+  interesado: { label: "Interesado", tone: "success" },
+  no_interesado: { label: "No interesado", tone: "danger" },
+};
+
+type InboxFilter = "all" | "interesado" | "no_interesado" | "con_seguimiento";
+
+const FILTER_TABS: { value: InboxFilter; label: string }[] = [
+  { value: "all", label: "Todas" },
+  { value: "interesado", label: "Interesados" },
+  { value: "no_interesado", label: "No interesados" },
+  { value: "con_seguimiento", label: "Con seguimiento" },
+];
 
 const ROLE_LABEL: Record<WhatsappMessage["role"], string> = {
   customer: "Cliente",
@@ -61,6 +76,7 @@ export function WhatsAppInbox({
   isNewPatientBySession?: Record<string, boolean>;
 }) {
   const [conversations, setConversations] = useState<WhatsappSession[]>(initialConversations);
+  const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id ?? null);
   const [messages, setMessages] = useState<WhatsappMessage[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -151,6 +167,14 @@ export function WhatsAppInbox({
     });
   };
 
+  const handleInterestChange = (interestLevel: LeadInterestLevel) => {
+    if (!selectedId) return;
+    setConversations((prev) => prev.map((c) => (c.id === selectedId ? { ...c, interest_level: interestLevel } : c)));
+    startTransition(() => {
+      updateWhatsappInterestAction(selectedId, interestLevel);
+    });
+  };
+
   const handleSend = () => {
     const body = replyText.trim();
     if (!body || !selectedId || isSending) return;
@@ -175,42 +199,80 @@ export function WhatsAppInbox({
     );
   }
 
+  const filteredConversations = conversations.filter((c) => {
+    switch (filter) {
+      case "interesado":
+        return c.interest_level === "interesado";
+      case "no_interesado":
+        return c.interest_level === "no_interesado";
+      case "con_seguimiento":
+        return c.followed_up_at !== null;
+      default:
+        return true;
+    }
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="w-full max-w-xs shrink-0 overflow-y-auto border-r border-border">
-        {conversations.map((conversation) => {
-          const config = STATUS_CONFIG[conversation.status];
-          const active = conversation.id === selectedId;
-          const label = conversation.customer_name || conversation.customer_phone;
-          const isNewPatient = isNewPatientBySession[conversation.id];
-          return (
-            <button
-              key={conversation.id}
-              type="button"
-              onClick={() => setSelectedId(conversation.id)}
-              className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-sm ${
-                active ? "bg-primary/10" : "hover:bg-black/5 dark:hover:bg-white/5"
-              }`}
-            >
-              <Avatar label={label} />
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium">{label}</span>
-                  <span className="shrink-0 text-xs text-muted">{formatTime(conversation.last_message_at, timeZone)}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone={config.tone}>{config.label}</Badge>
-                  {isNewPatient !== undefined && (
-                    <Badge tone={isNewPatient ? "success" : "neutral"}>
-                      {isNewPatient ? "Cliente nuevo" : "Cliente existente"}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap gap-1.5">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setFilter(tab.value)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              filter === tab.value
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="w-full max-w-xs shrink-0 overflow-y-auto border-r border-border">
+          {filteredConversations.length === 0 ? (
+            <p className="p-4 text-sm text-muted">No hay conversaciones en este filtro.</p>
+          ) : (
+            filteredConversations.map((conversation) => {
+              const config = STATUS_CONFIG[conversation.status];
+              const interest = INTEREST_CONFIG[conversation.interest_level];
+              const active = conversation.id === selectedId;
+              const label = conversation.customer_name || conversation.customer_phone;
+              const isNewPatient = isNewPatientBySession[conversation.id];
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => setSelectedId(conversation.id)}
+                  className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-sm ${
+                    active ? "bg-primary/10" : "hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <Avatar label={label} />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{label}</span>
+                      <span className="shrink-0 text-xs text-muted">{formatTime(conversation.last_message_at, timeZone)}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={config.tone}>{config.label}</Badge>
+                      {conversation.interest_level !== "sin_evaluar" && <Badge tone={interest.tone}>{interest.label}</Badge>}
+                      {conversation.followed_up_at && <Badge tone="neutral">Seguimiento enviado</Badge>}
+                      {isNewPatient !== undefined && (
+                        <Badge tone={isNewPatient ? "success" : "neutral"}>
+                          {isNewPatient ? "Cliente nuevo" : "Cliente existente"}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {selected ? (
@@ -230,18 +292,32 @@ export function WhatsAppInbox({
                   </div>
                 </div>
               </div>
-              <select
-                value={selected.status}
-                disabled={isPending}
-                onChange={(e) => handleStatusChange(e.target.value as WhatsappConversationStatus)}
-                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selected.interest_level}
+                  disabled={isPending}
+                  onChange={(e) => handleInterestChange(e.target.value as LeadInterestLevel)}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {Object.entries(INTEREST_CONFIG).map(([value, { label }]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selected.status}
+                  disabled={isPending}
+                  onChange={(e) => handleStatusChange(e.target.value as WhatsappConversationStatus)}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="flex-1 space-y-1.5 overflow-y-auto bg-[#e5ddd5] p-4 dark:bg-[#0b141a]">
@@ -302,6 +378,7 @@ export function WhatsAppInbox({
             Elegí una conversación de la izquierda.
           </div>
         )}
+      </div>
       </div>
     </div>
   );

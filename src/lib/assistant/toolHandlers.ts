@@ -17,14 +17,16 @@ import {
   bookAppointmentSchema,
   cancelAppointmentSchema,
   checkAvailabilitySchema,
+  closeClientSchema,
   createOrderSchema,
   getPropertiesSchema,
   logInquirySchema,
   requestHumanHandoffSchema,
   reserveTableSchema,
   scheduleVisitSchema,
+  updateLeadInterestSchema,
 } from "@/lib/validation";
-import { TOOL_NAMES } from "@/lib/vapi/tools";
+import { TOOL_NAMES } from "@/lib/assistant/tools";
 import type { AgentConfig, Clinic, Database } from "@/types/database";
 
 type AdminClient = SupabaseClient<Database>;
@@ -33,10 +35,8 @@ export interface ToolHandlerContext {
   admin: AdminClient;
   clinic: Clinic;
   config: AgentConfig;
-  /** id de la fila en `calls` para esta llamada (ya existe gracias al upsert previo al dispatch). */
-  callRowId: string | null;
-  /** id de la fila en `whatsapp_sessions` si este tool call vino de una conversación de WhatsApp (no aplica a llamadas de voz). */
-  whatsappSessionId?: string | null;
+  /** id de la fila en `whatsapp_sessions` de esta conversación — todas las tools corren sobre WhatsApp. */
+  whatsappSessionId: string | null;
 }
 
 /**
@@ -44,7 +44,7 @@ export interface ToolHandlerContext {
  * del año real (p. ej. pide "2024-08-24" cuando hoy es 2026). Si la fecha
  * pedida cae en el pasado, la adelantamos año a año hasta la próxima
  * ocurrencia futura de ese mismo mes/día/hora — asume que un cliente que
- * llama nunca quiere agendar algo que ya pasó.
+ * escribe nunca quiere agendar algo que ya pasó.
  */
 function assumeFutureIntent(date: Date, now: Date): Date {
   let candidate = date;
@@ -59,9 +59,9 @@ function assumeFutureIntent(date: Date, now: Date): Date {
 }
 
 /**
- * Aviso por WhatsApp al dueño del negocio (no al cliente) de que se agendó
- * una cita nueva — más confiable que el push del navegador para que llegue
- * al instante al celular. Requiere que el negocio tenga WhatsApp conectado y
+ * Aviso por WhatsApp al dueño del negocio (no al cliente) de que pasó algo
+ * importante — más confiable que el push del navegador para que llegue al
+ * instante al celular. Requiere que el negocio tenga WhatsApp conectado y
  * haya cargado su propio número en Personalización; si no, no hace nada.
  */
 async function notifyOwnerByWhatsApp(ctx: ToolHandlerContext, body: string): Promise<void> {
@@ -213,8 +213,7 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
     .from("appointments")
     .insert({
       clinic_id: ctx.clinic.id,
-      call_id: ctx.callRowId,
-      whatsapp_session_id: ctx.whatsappSessionId ?? null,
+      whatsapp_session_id: ctx.whatsappSessionId,
       google_event_id: googleEventId,
       google_event_link: googleEventLink,
       patient_name: data.patientName,
@@ -253,7 +252,7 @@ async function handleBookAppointment(ctx: ToolHandlerContext, rawArgs: unknown):
   // todavía pendiente — así que hay que esperarla antes de retornar.
   const localWhen = formatLocal(start, ctx.clinic.timezone);
   await sendPushToClinic(ctx.admin, ctx.clinic.id, {
-    title: "Nueva llamada agendada",
+    title: "Nueva cita agendada",
     body: `${data.patientName} — ${data.treatment} — ${localWhen}`,
     url: "/crm",
   }).catch((err) => console.error("No se pudo enviar la notificación push de la nueva cita:", err));
@@ -311,7 +310,7 @@ function handleGetMenu(ctx: ToolHandlerContext): string {
 
 async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
   if (ctx.config.orders_paused) {
-    return "En este momento no estamos tomando pedidos por teléfono, pero puedo responder cualquier consulta que tengas.";
+    return "En este momento no estamos tomando pedidos, pero puedo responder cualquier consulta que tengas.";
   }
   if (!isWithinBusinessHours(ctx.config.business_hours, ctx.clinic.timezone)) {
     return "En este momento estamos cerrados y no podemos tomar pedidos, pero puedo responder tus consultas o contarte el horario de atención.";
@@ -352,7 +351,6 @@ async function handleCreateOrder(ctx: ToolHandlerContext, rawArgs: unknown): Pro
     .from("orders")
     .insert({
       clinic_id: ctx.clinic.id,
-      call_id: ctx.callRowId,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       order_type: data.orderType,
@@ -384,7 +382,6 @@ async function handleReserveTable(ctx: ToolHandlerContext, rawArgs: unknown): Pr
     .from("table_reservations")
     .insert({
       clinic_id: ctx.clinic.id,
-      call_id: ctx.callRowId,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       party_size: data.partySize,
@@ -443,7 +440,6 @@ async function handleScheduleVisit(ctx: ToolHandlerContext, rawArgs: unknown): P
     .insert({
       clinic_id: ctx.clinic.id,
       property_id: data.propertyId,
-      call_id: ctx.callRowId,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       visit_time: visitTime.toISOString(),
@@ -469,7 +465,6 @@ async function handleLogInquiry(ctx: ToolHandlerContext, rawArgs: unknown): Prom
 
   const { error } = await ctx.admin.from("inquiries").insert({
     clinic_id: ctx.clinic.id,
-    call_id: ctx.callRowId,
     customer_name: data.customerName ?? null,
     customer_phone: data.customerPhone,
     reason: data.reason,
@@ -481,6 +476,96 @@ async function handleLogInquiry(ctx: ToolHandlerContext, rawArgs: unknown): Prom
   }
 
   return "Consulta anotada.";
+}
+
+/**
+ * Registra que se cerró una venta (no una cita) — distinto de bookAppointment.
+ * Idempotente por conversación: si ya existe un cliente cerrado para esta
+ * misma sesión de WhatsApp, actualiza en vez de duplicar, así el asistente
+ * puede volver a llamar a esta tool más adelante en la misma charla para
+ * sumar los datos de onboarding que vaya juntando.
+ */
+async function handleCloseClient(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = closeClientSchema.safeParse(rawArgs);
+  if (!parsed.success) {
+    return "Me faltan datos para registrarlo como cliente — necesito su nombre, teléfono y el servicio en el que arrancamos.";
+  }
+  const data = parsed.data;
+
+  const { data: existing } = ctx.whatsappSessionId
+    ? await ctx.admin
+        .from("closed_clients")
+        .select("id, notes")
+        .eq("clinic_id", ctx.clinic.id)
+        .eq("whatsapp_session_id", ctx.whatsappSessionId)
+        .maybeSingle()
+    : { data: null };
+
+  if (existing) {
+    const { error } = await ctx.admin
+      .from("closed_clients")
+      .update({
+        client_name: data.clientName,
+        client_phone: data.clientPhone,
+        service: data.service,
+        notes: [existing.notes, data.notes].filter(Boolean).join("\n") || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    if (error) {
+      console.error("Error al actualizar el cliente cerrado:", error);
+      return "No pude actualizar sus datos, pero seguí adelante igual.";
+    }
+    return JSON.stringify({ closed: true, updated: true });
+  }
+
+  const { data: inserted, error } = await ctx.admin
+    .from("closed_clients")
+    .insert({
+      clinic_id: ctx.clinic.id,
+      whatsapp_session_id: ctx.whatsappSessionId,
+      client_name: data.clientName,
+      client_phone: data.clientPhone,
+      service: data.service,
+      notes: data.notes ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !inserted) {
+    console.error("Error al registrar el cliente cerrado:", error);
+    return "No pude registrarlo, intentemos de nuevo en un momento.";
+  }
+
+  await sendPushToClinic(ctx.admin, ctx.clinic.id, {
+    title: "🎉 Nuevo cliente cerrado",
+    body: `${data.clientName} — ${data.service}`,
+    url: "/crm",
+  }).catch((err) => console.error("No se pudo enviar la notificación push del cliente cerrado:", err));
+
+  await notifyOwnerByWhatsApp(ctx, `🎉 Nuevo cliente cerrado: ${data.clientName} — ${data.service}.`);
+
+  return JSON.stringify({ closed: true, clientId: inserted.id });
+}
+
+/** Marca el nivel de interés del lead en esta conversación — alimenta los filtros del panel de CRM. */
+async function handleUpdateLeadInterest(ctx: ToolHandlerContext, rawArgs: unknown): Promise<string> {
+  const parsed = updateLeadInterestSchema.safeParse(rawArgs);
+  if (!parsed.success || !ctx.whatsappSessionId) {
+    return "No se pudo registrar el nivel de interés.";
+  }
+
+  const { error } = await ctx.admin
+    .from("whatsapp_sessions")
+    .update({ interest_level: parsed.data.level })
+    .eq("id", ctx.whatsappSessionId);
+
+  if (error) {
+    console.error("Error al actualizar el nivel de interés del lead:", error);
+    return "No se pudo registrar el nivel de interés.";
+  }
+
+  return JSON.stringify({ updated: true });
 }
 
 function handleGetClinicInfo(ctx: ToolHandlerContext): string {
@@ -500,8 +585,8 @@ function handleGetClinicInfo(ctx: ToolHandlerContext): string {
 function handleRequestHumanHandoff(ctx: ToolHandlerContext, rawArgs: unknown): string {
   const parsed = requestHumanHandoffSchema.safeParse(rawArgs);
   const reason = parsed.success ? parsed.data.reason : undefined;
-  console.info(`[handoff] clinic=${ctx.clinic.id} call=${ctx.callRowId ?? "?"} reason=${reason ?? "sin especificar"}`);
-  return ctx.config.handoff_message?.trim() || "Entiendo, permítame conectarlo con alguien del equipo de la clínica.";
+  console.info(`[handoff] clinic=${ctx.clinic.id} session=${ctx.whatsappSessionId ?? "?"} reason=${reason ?? "sin especificar"}`);
+  return ctx.config.handoff_message?.trim() || "Entiendo, permítime conectarte con alguien del equipo.";
 }
 
 export async function dispatchToolCall(ctx: ToolHandlerContext, name: string, rawArgs: unknown): Promise<string> {
@@ -528,6 +613,10 @@ export async function dispatchToolCall(ctx: ToolHandlerContext, name: string, ra
       return handleScheduleVisit(ctx, rawArgs);
     case TOOL_NAMES.logInquiry:
       return handleLogInquiry(ctx, rawArgs);
+    case TOOL_NAMES.closeClient:
+      return handleCloseClient(ctx, rawArgs);
+    case TOOL_NAMES.updateLeadInterest:
+      return handleUpdateLeadInterest(ctx, rawArgs);
     default:
       return `Tool no reconocida: ${name}`;
   }
